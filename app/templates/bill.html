@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block title %}{{ bill.filename }}{% endblock %}
+
+{% block content %}
+<p class="crumbs"><a href="/">Bills</a> &rsaquo; {{ bill.filename }}</p>
+
+<header class="bill-header">
+  <h1>{{ bill.filename }}</h1>
+  <span class="pill pill-{{ bill.status }}">{{ status_label(bill.status) }}</span>
+</header>
+
+{% if message %}<p class="flash">{{ message }}</p>{% endif %}
+
+<ol class="tracker">
+  {% for stage in stages %}
+  <li class="{{ stage.state }}"><span class="n">{{ loop.index }}</span>{{ stage.name }}</li>
+  {% endfor %}
+</ol>
+
+<div class="columns">
+  <section class="doc-col">
+    <h2>The bill</h2>
+    {% if document_html %}
+      <div class="document">{{ document_html|safe }}</div>
+      <p class="muted">Click any value on the right to highlight the line it was read from.</p>
+    {% else %}
+      <p class="muted">
+        This file was uploaded rather than chosen from the samples. Uploaded documents are not
+        rendered on the page, because that markup is somebody else's.
+      </p>
+    {% endif %}
+  </section>
+
+  <section class="panel-col">
+
+    {# ---------- the panel for the stage the bill is on ---------- #}
+    <div class="panel">
+      <h2>Stage {{ stages|selectattr('state', 'equalto', 'done')|list|length }} of 8 done</h2>
+
+      {% if bill.status == 'received' %}
+        <p>The file is stored under the hash of its contents. Nothing has been read yet.</p>
+
+      {% elif bill.status == 'read' %}
+        <p>
+          The reader returned {{ fields|length }} fields with a confidence and a source line for
+          each. None of it has been tested yet.
+        </p>
+
+      {% elif bill.status == 'needs_answer' %}
+        <h3>{{ open_questions|length }} question{{ '' if open_questions|length == 1 else 's' }} for the owner</h3>
+        {% for question in open_questions %}
+        <form class="question" method="post" action="/bills/{{ bill.id }}/questions/{{ question.id }}">
+          <p class="ask">{{ question.prompt }}</p>
+          {% if question.line_id %}
+          <p><button type="button" class="linkish" data-line-ref="{{ question.line_id }}">Show me on the bill</button></p>
+          {% endif %}
+          {% if question.status == 'unsure' %}
+          <p class="muted">Flagged for a person to check. You can still answer it.</p>
+          {% endif %}
+          <div class="answers">
+            <button type="submit" name="action" value="confirm">
+              Yes, {{ display(question.field_name, question.read_value) }} is right
+            </button>
+            <span class="or">or</span>
+            <input type="{{ 'date' if question.field_name in date_fields else 'text' }}"
+                   name="value" placeholder="Type what the bill says">
+            <button type="submit" name="action" value="correct">Use this instead</button>
+            <span class="or">or</span>
+            <button type="submit" name="action" value="unsure" class="quiet">I'm not sure</button>
+          </div>
+        </form>
+        {% endfor %}
+
+      {% elif bill.status == 'ready' %}
+        <p>Every check either passes or has been settled by the owner. Nothing is guessed at.</p>
+
+      {% elif bill.status == 'enriched' and enrichment %}
+        <h3>What this adds up to</h3>
+        <dl class="facts">
+          <dt>Business</dt><dd>{{ enrichment.profile.sector }}, {{ enrichment.profile.employees }} staff</dd>
+          <dt>Usage</dt><dd>about {{ '{:,}'.format(enrichment.annual_kwh) }} kWh a year at the current rate of use</dd>
+          <dt>Contract</dt><dd>ends in {{ enrichment.days_left }} days, on {{ pretty_date(enrichment.contract_end) }}</dd>
+        </dl>
+        <p class="muted">
+          No saving is shown. There is no market price data here, and an invented figure is the
+          fastest way to lose a small business owner.
+        </p>
+
+      {% elif bill.status in ('awaiting_approval', 'approved', 'sent', 'replied') and payload %}
+        <h3>What we will send</h3>
+        <p class="hash">Version <code>{{ enquiry.payload_hash[:16] }}</code></p>
+        <pre class="note">{{ enquiry.covering_note }}</pre>
+
+        <h4>The figures in the request</h4>
+        <table class="kv">
+          <tr><th>Meter number</th><td>{{ payload.supply.mpan }}</td></tr>
+          <tr><th>Site</th><td>{{ payload.supply.address }}, {{ payload.supply.postcode }}</td></tr>
+          <tr><th>Used</th><td>{{ '{:,.0f}'.format(payload.usage.kwh) }} kWh over {{ payload.usage.days }} days</td></tr>
+          <tr><th>A year</th><td>about {{ '{:,}'.format(payload.usage.annual_estimate_kwh) }} kWh</td></tr>
+          <tr><th>Current supplier</th><td>{{ payload.current_contract.supplier }}, until {{ pretty_date(payload.current_contract.end_date) }}</td></tr>
+          <tr><th>Quotes for</th><td>12, 24 and 36 months from {{ pretty_date(payload.request.supply_starts) }}</td></tr>
+        </table>
+
+        <h4>Who it goes to</h4>
+        <ul class="plain">
+          {% for recipient in payload.recipients %}
+          <li>{{ recipient.name }} &middot; <span class="muted">{{ recipient.email }}</span></li>
+          {% endfor %}
+        </ul>
+
+        <h4>What happens next</h4>
+        <p>
+          Each supplier replies with a quote. Nothing is switched and no contract is signed.
+          Choosing a quote is a second decision with an approval of its own.
+        </p>
+
+        {% if bill.status == 'awaiting_approval' %}
+        <form class="approve" method="post" action="/bills/{{ bill.id }}/approve">
+          <input type="hidden" name="approver" value="{{ payload.business.contact }}">
+          <label class="tick">
+            <input type="checkbox" name="authority" value="yes" id="authority">
+            I authorise Bill to Enquiry to request quotes from these suppliers on my behalf.
+          </label>
+          <button type="submit" id="approve-button" disabled>Approve as {{ payload.business.contact }}</button>
+        </form>
+        {% elif approval %}
+        <p class="approved">
+          Approved by {{ approval.approver }} on {{ approval.approved_at }}, covering version
+          <code>{{ approval.payload_hash[:16] }}</code>.
+        </p>
+        {% else %}
+        <p class="warn">
+          There is no approval covering this version of the enquiry. Sending is refused until the
+          owner approves it again.
+        </p>
+        {% endif %}
+
+        {% if bill.status == 'approved' %}
+        <form method="post" action="/bills/{{ bill.id }}/send">
+          <button type="submit">Send to the three suppliers</button>
+        </form>
+        {% endif %}
+
+      {% elif bill.status == 'rejected' %}
+        <p>The owner rejected this enquiry. Nothing was sent.</p>
+
+      {% elif bill.status == 'failed' %}
+        <p class="warn">This bill could not be read. The timeline below says why.</p>
+      {% endif %}
+
+      {% if bill.status in ('sent', 'replied') %}
+        <h3>Sent</h3>
+        <ul class="plain">
+          {% for row in outbox %}
+          <li>{{ row.recipient }} <span class="muted">{{ row.created_at }}</span></li>
+          {% endfor %}
+        </ul>
+        <form class="inline" method="post" action="/bills/{{ bill.id }}/send">
+          <button type="submit" class="quiet">Send again (simulate a retry)</button>
+        </form>
+        <form class="inline" method="post" action="/bills/{{ bill.id }}/reply">
+          <button type="submit" class="quiet">Simulate a supplier reply</button>
+        </form>
+        {% for reply in replies %}
+        <blockquote class="reply"><strong>{{ reply.recipient }}</strong><br>{{ reply.body }}</blockquote>
+        {% endfor %}
+      {% endif %}
+
+      <div class="actions">
+        {% if runnable %}
+        <form class="inline" method="post" action="/bills/{{ bill.id }}/next">
+          <button type="submit">Run next stage: {{ current_stage }}</button>
+        </form>
+        <form class="inline" method="post" action="/bills/{{ bill.id }}/run">
+          <button type="submit" class="quiet">Run to approval</button>
+        </form>
+        {% elif waiting %}
+        <p class="muted">{{ waiting }}</p>
+        {% endif %}
+      </div>
+
+      {% if enquiry and bill.status in ('awaiting_approval', 'approved') %}
+      <details class="edit">
+        <summary>Edit a value</summary>
+        <p class="muted">
+          Changing anything changes the hash of the enquiry, which voids an approval of the
+          older version.
+        </p>
+        <form method="post" action="/bills/{{ bill.id }}/edit">
+          <select name="field">
+            {% for field in fields %}
+            <option value="{{ field.name }}">{{ label(field.name) }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="value" placeholder="New value" required>
+          <button type="submit">Change it</button>
+        </form>
+      </details>
+      <details class="edit">
+        <summary>Reject this enquiry</summary>
+        <form method="post" action="/bills/{{ bill.id }}/reject">
+          <input type="text" name="reason" placeholder="Why" required>
+          <button type="submit" class="quiet">Reject</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    {# ---------- everything the reader produced ---------- #}
+    {% if fields %}
+    <div class="panel">
+      <h3>What we read</h3>
+      <table class="kv fields">
+        {% for field in fields %}
+        <tr>
+          <th>{{ label(field.name) }}</th>
+          <td>
+            <button type="button" class="linkish" data-line-ref="{{ field.line_id }}">
+              {{ display(field.name, field.value) }}
+            </button>
+          </td>
+          <td class="src">
+            {% if field.source == 'customer' and field.value == field.read_value %}
+              <span class="tag tag-confirmed">confirmed by you</span>
+            {% elif field.source == 'customer' %}
+              <span class="tag tag-corrected">corrected by you</span>
+              <span class="muted">was {{ display(field.name, field.read_value) }}</span>
+            {% else %}
+              <span class="tag">read from bill</span>
+              <span class="muted {{ 'low' if field.confidence < 0.85 }}">{{ '{:.0%}'.format(field.confidence) }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+
+    {# ---------- the checks ---------- #}
+    {% if checks %}
+    <div class="panel">
+      <h3>Checks</h3>
+      <p class="muted">Plain code, no model. Each one is a function in <code>app/checks.py</code>.</p>
+      <ul class="checks">
+        {% for check in checks %}
+        <li class="{{ 'pass' if check.passed else ('accepted' if check.accepted else 'fail') }}">
+          <span class="mark">{{ 'PASS' if check.passed else ('SETTLED' if check.accepted else 'FAIL') }}</span>
+          <strong>{{ check.title }}</strong>
+          <span>{{ check.message }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {# ---------- the reasoning for this stage ---------- #}
+    {% if decisions %}
+    <div class="panel why">
+      <h3>Why it works this way</h3>
+      {% for decision in decisions %}
+      <article>
+        <h4>{{ decision.title }}</h4>
+        {{ decision.html|safe }}
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </section>
+</div>
+
+<section class="panel timeline">
+  <h3>What happened</h3>
+  <table class="grid">
+    <tbody>
+      {% for event in events %}
+      <tr>
+        <td class="muted">{{ event.at }}</td>
+        <td>{{ event.actor }}</td>
+        <td>
+          {% if event.to_status %}
+          <span class="pill pill-{{ event.to_status }}">{{ status_label(event.to_status) }}</span>
+          {% endif %}
+        </td>
+        <td>{{ event.detail }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

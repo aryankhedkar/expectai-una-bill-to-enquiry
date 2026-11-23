@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Outbox{% endblock %}
+
+{% block content %}
+<h1>Outbox</h1>
+<p class="muted">
+  Sending writes a row here rather than sending an email. The unique key is the enquiry, the
+  recipient and the hash of what was approved, so running send again writes nothing.
+</p>
+
+{% if rows %}
+<table class="grid">
+  <thead>
+    <tr><th>Bill</th><th>Recipient</th><th>Approved hash</th><th>Written</th></tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td><a href="/bills/{{ row.bill_id }}">{{ row.filename }}</a></td>
+      <td>{{ row.recipient }}</td>
+      <td><code>{{ row.payload_hash[:16] }}</code></td>
+      <td class="muted">{{ row.created_at }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Nothing has been sent yet.</p>
+{% endif %}
+{% endblock %}

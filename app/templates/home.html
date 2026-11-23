@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="intro">
+  <h1>From an energy bill to an enquiry the owner approved</h1>
+  <p>
+    A small business uploads an electricity bill. The system reads it, checks what it read,
+    asks about anything it is unsure of, drafts a quote request to suppliers, waits for
+    approval, and sends it once.
+  </p>
+  <p>
+    The reasoning behind each stage is on the <a href="/design">design page</a> and beside the
+    stage it belongs to. Start with a sample bill and press through the eight stages.
+  </p>
+</section>
+
+{% if message %}<p class="flash">{{ message }}</p>{% endif %}
+
+<h2>Sample bills</h2>
+<div class="cards">
+  {% for sample in samples %}
+  <form class="card" method="post" action="/samples/{{ sample.name }}">
+    <h3>{{ sample.title }}</h3>
+    <p class="muted">{{ sample.blurb }}</p>
+    <p><code>{{ sample.name }}.html</code></p>
+    <button type="submit">Open this bill</button>
+  </form>
+  {% endfor %}
+</div>
+
+<h2>Upload a bill</h2>
+<form class="upload" method="post" action="/upload" enctype="multipart/form-data">
+  <input type="file" name="file" required>
+  <button type="submit">Upload</button>
+</form>
+<p class="muted">
+  Uploading one of the sample files again shows the duplicate check: the file is hashed, the
+  hash is already here, and no second bill is created. Any other file is accepted and then
+  fails at the reading stage, because demo mode replays recorded output for the samples only.
+</p>
+
+<h2>Bills</h2>
+{% if bills %}
+<table class="grid">
+  <thead><tr><th>File</th><th>Status</th><th>Opened</th><th></th></tr></thead>
+  <tbody>
+    {% for bill in bills %}
+    <tr>
+      <td>{{ bill.filename }}</td>
+      <td><span class="pill pill-{{ bill.status }}">{{ status_label(bill.status) }}</span></td>
+      <td class="muted">{{ bill.created_at }}</td>
+      <td><a href="/bills/{{ bill.id }}">Open</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No bills yet. Open one of the samples above.</p>
+{% endif %}
+{% endblock %}

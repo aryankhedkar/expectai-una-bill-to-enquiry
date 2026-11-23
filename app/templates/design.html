@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}The design{% endblock %}
+
+{% block content %}
+<div class="design">
+  <aside class="contents">
+    <h2>Contents</h2>
+    <ol>
+      {% for page in pages %}
+      <li><a href="#{{ page.slug }}">{{ page.title }}</a></li>
+      {% endfor %}
+    </ol>
+    <p class="muted">
+      These are the files in <code>docs/</code>, in the order they were written. The brief the
+      build followed is <code>BUILD_BRIEF.md</code> in the repository.
+    </p>
+  </aside>
+
+  <div class="blocks">
+    {% for page in pages %}
+    <section class="block" id="{{ page.slug }}">
+      <h2>{{ page.title }}</h2>
+      {{ page.html|safe }}
+    </section>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
