@@ -1,0 +1,115 @@
+{
+  "reader": "recorded",
+  "model": "claude-sonnet-4-5",
+  "prompt_version": "bill-fields-v1",
+  "fields": {
+    "supplier_name": {
+      "value": "Pennine Power",
+      "confidence": 0.97,
+      "line": "L01",
+      "line_text": "Pennine Power"
+    },
+    "business_name": {
+      "value": "Castlegate Dental Practice Ltd",
+      "confidence": 0.97,
+      "line": "L02",
+      "line_text": "Castlegate Dental Practice Ltd"
+    },
+    "supply_address": {
+      "value": "8 Castlegate, Leeds",
+      "confidence": 0.94,
+      "line": "L03",
+      "line_text": "8 Castlegate, Leeds"
+    },
+    "postcode": {
+      "value": "LS2 7EF",
+      "confidence": 0.97,
+      "line": "L04",
+      "line_text": "LS2 7EF"
+    },
+    "account_number": {
+      "value": "PP-90114-C",
+      "confidence": 0.93,
+      "line": "L05",
+      "line_text": "PP-90114-C"
+    },
+    "mpan": {
+      "value": "1200044556677",
+      "confidence": 0.97,
+      "line": "L06",
+      "line_text": "1200044556677"
+    },
+    "period_start": {
+      "value": "2026-10-01",
+      "confidence": 0.97,
+      "line": "L07",
+      "line_text": "1 October 2026 to 31 October 2026"
+    },
+    "period_end": {
+      "value": "2026-10-31",
+      "confidence": 0.97,
+      "line": "L07",
+      "line_text": "1 October 2026 to 31 October 2026"
+    },
+    "kwh": {
+      "value": "3000",
+      "confidence": 0.97,
+      "line": "L08",
+      "line_text": "3,000 kWh"
+    },
+    "unit_rate_p": {
+      "value": "26.79",
+      "confidence": 0.97,
+      "line": "L09",
+      "line_text": "26.79p per kWh"
+    },
+    "standing_charge_p": {
+      "value": "55.00",
+      "confidence": 0.97,
+      "line": "L10",
+      "line_text": "55.00p per day for 31 days"
+    },
+    "energy_charge": {
+      "value": "803.70",
+      "confidence": 0.97,
+      "line": "L11",
+      "line_text": "Energy charge \u00a3803.70"
+    },
+    "standing_charge_total": {
+      "value": "17.05",
+      "confidence": 0.97,
+      "line": "L12",
+      "line_text": "Standing charge \u00a317.05"
+    },
+    "climate_change_levy": {
+      "value": "23.25",
+      "confidence": 0.97,
+      "line": "L13",
+      "line_text": "Climate change levy \u00a323.25"
+    },
+    "subtotal": {
+      "value": "844.00",
+      "confidence": 0.97,
+      "line": "L14",
+      "line_text": "Subtotal \u00a3844.00"
+    },
+    "vat": {
+      "value": "168.80",
+      "confidence": 0.97,
+      "line": "L15",
+      "line_text": "VAT at 20% \u00a3168.80"
+    },
+    "total": {
+      "value": "1021.80",
+      "confidence": 0.97,
+      "line": "L16",
+      "line_text": "Total due \u00a31,021.80"
+    },
+    "contract_end_date": {
+      "value": "2027-05-31",
+      "confidence": 0.97,
+      "line": "L17",
+      "line_text": "31 May 2027"
+    }
+  }
+}

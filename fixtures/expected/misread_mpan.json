@@ -1,0 +1,20 @@
+{
+  "supplier_name": "Northwind Energy",
+  "business_name": "Mill Street Print Works Ltd",
+  "supply_address": "3 Mill Street, Manchester",
+  "postcode": "M4 6LN",
+  "account_number": "NW-8820-1174",
+  "mpan": "1900024681357",
+  "period_start": "2026-10-15",
+  "period_end": "2026-11-14",
+  "kwh": "6340",
+  "unit_rate_p": "27.50",
+  "standing_charge_p": "72.00",
+  "energy_charge": "1743.50",
+  "standing_charge_total": "22.32",
+  "climate_change_levy": "49.13",
+  "subtotal": "1814.95",
+  "vat": "362.99",
+  "total": "2177.94",
+  "contract_end_date": "2027-06-30"
+}

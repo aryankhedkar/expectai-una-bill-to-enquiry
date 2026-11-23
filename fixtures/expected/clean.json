@@ -1,0 +1,20 @@
+{
+  "supplier_name": "Northwind Energy",
+  "business_name": "Harbour Lane Bakery Ltd",
+  "supply_address": "14 Harbour Lane, Bristol",
+  "postcode": "BS1 4QT",
+  "account_number": "NW-4471-2208",
+  "mpan": "1200012345679",
+  "period_start": "2026-10-01",
+  "period_end": "2026-10-31",
+  "kwh": "4820",
+  "unit_rate_p": "28.40",
+  "standing_charge_p": "60.00",
+  "energy_charge": "1368.88",
+  "standing_charge_total": "18.60",
+  "climate_change_levy": "37.35",
+  "subtotal": "1424.83",
+  "vat": "284.97",
+  "total": "1709.80",
+  "contract_end_date": "2027-03-31"
+}

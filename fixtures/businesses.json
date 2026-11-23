@@ -1,0 +1,26 @@
+{
+  "Harbour Lane Bakery Ltd": {
+    "sector": "Bakery and cafe",
+    "employees": 11,
+    "contact": "Priya Raman",
+    "role": "Owner"
+  },
+  "Castlegate Dental Practice Ltd": {
+    "sector": "Dental practice",
+    "employees": 18,
+    "contact": "Tom Whitfield",
+    "role": "Practice manager"
+  },
+  "Ridgeway Veterinary Clinic Ltd": {
+    "sector": "Veterinary clinic",
+    "employees": 24,
+    "contact": "Hannah Okonjo",
+    "role": "Owner"
+  },
+  "Mill Street Print Works Ltd": {
+    "sector": "Commercial printing",
+    "employees": 37,
+    "contact": "Dev Shah",
+    "role": "Operations director"
+  }
+}

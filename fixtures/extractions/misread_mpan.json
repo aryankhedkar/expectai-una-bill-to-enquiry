@@ -1,0 +1,115 @@
+{
+  "reader": "recorded",
+  "model": "claude-sonnet-4-5",
+  "prompt_version": "bill-fields-v1",
+  "fields": {
+    "supplier_name": {
+      "value": "Northwind Energy",
+      "confidence": 0.97,
+      "line": "L01",
+      "line_text": "Northwind Energy"
+    },
+    "business_name": {
+      "value": "Mill Street Print Works Ltd",
+      "confidence": 0.97,
+      "line": "L02",
+      "line_text": "Mill Street Print Works Ltd"
+    },
+    "supply_address": {
+      "value": "3 Mill Street, Manchester",
+      "confidence": 0.94,
+      "line": "L03",
+      "line_text": "3 Mill Street, Manchester"
+    },
+    "postcode": {
+      "value": "M4 6LN",
+      "confidence": 0.97,
+      "line": "L04",
+      "line_text": "M4 6LN"
+    },
+    "account_number": {
+      "value": "NW-8820-1174",
+      "confidence": 0.93,
+      "line": "L05",
+      "line_text": "NW-8820-1174"
+    },
+    "mpan": {
+      "value": "1900027681357",
+      "confidence": 0.91,
+      "line": "L06",
+      "line_text": "1900024681357"
+    },
+    "period_start": {
+      "value": "2026-10-15",
+      "confidence": 0.97,
+      "line": "L07",
+      "line_text": "15 October 2026 to 14 November 2026"
+    },
+    "period_end": {
+      "value": "2026-11-14",
+      "confidence": 0.97,
+      "line": "L07",
+      "line_text": "15 October 2026 to 14 November 2026"
+    },
+    "kwh": {
+      "value": "6340",
+      "confidence": 0.97,
+      "line": "L08",
+      "line_text": "6,340 kWh"
+    },
+    "unit_rate_p": {
+      "value": "27.50",
+      "confidence": 0.97,
+      "line": "L09",
+      "line_text": "27.50p per kWh"
+    },
+    "standing_charge_p": {
+      "value": "72.00",
+      "confidence": 0.97,
+      "line": "L10",
+      "line_text": "72.00p per day for 31 days"
+    },
+    "energy_charge": {
+      "value": "1743.50",
+      "confidence": 0.97,
+      "line": "L11",
+      "line_text": "Energy charge \u00a31,743.50"
+    },
+    "standing_charge_total": {
+      "value": "22.32",
+      "confidence": 0.97,
+      "line": "L12",
+      "line_text": "Standing charge \u00a322.32"
+    },
+    "climate_change_levy": {
+      "value": "49.13",
+      "confidence": 0.97,
+      "line": "L13",
+      "line_text": "Climate change levy \u00a349.13"
+    },
+    "subtotal": {
+      "value": "1814.95",
+      "confidence": 0.97,
+      "line": "L14",
+      "line_text": "Subtotal \u00a31,814.95"
+    },
+    "vat": {
+      "value": "362.99",
+      "confidence": 0.97,
+      "line": "L15",
+      "line_text": "VAT at 20% \u00a3362.99"
+    },
+    "total": {
+      "value": "2177.94",
+      "confidence": 0.97,
+      "line": "L16",
+      "line_text": "Total due \u00a32,177.94"
+    },
+    "contract_end_date": {
+      "value": "2027-06-30",
+      "confidence": 0.97,
+      "line": "L17",
+      "line_text": "30 June 2027"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Brightmoor Energy",
+    "email": "tenders@brightmoor.example",
+    "note": "Fixed term business supply"
+  },
+  {
+    "name": "Severn Grid Supply",
+    "email": "quotes@severngrid.example",
+    "note": "Small business panel"
+  },
+  {
+    "name": "Kestrel Utilities",
+    "email": "newbusiness@kestrelutilities.example",
+    "note": "Green tariffs"
+  }
+]

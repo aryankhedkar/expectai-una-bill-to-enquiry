@@ -1,0 +1,20 @@
+{
+  "supplier_name": "Pennine Power",
+  "business_name": "Castlegate Dental Practice Ltd",
+  "supply_address": "8 Castlegate, Leeds",
+  "postcode": "LS2 7EF",
+  "account_number": "PP-90114-C",
+  "mpan": "1200044556677",
+  "period_start": "2026-10-01",
+  "period_end": "2026-10-31",
+  "kwh": "3000",
+  "unit_rate_p": "26.79",
+  "standing_charge_p": "55.00",
+  "energy_charge": "803.70",
+  "standing_charge_total": "17.05",
+  "climate_change_levy": "23.25",
+  "subtotal": "844.00",
+  "vat": "168.80",
+  "total": "1021.80",
+  "contract_end_date": "2027-05-31"
+}

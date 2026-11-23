@@ -1,0 +1,115 @@
+{
+  "reader": "recorded",
+  "model": "claude-sonnet-4-5",
+  "prompt_version": "bill-fields-v1",
+  "fields": {
+    "supplier_name": {
+      "value": "Caledon Energy",
+      "confidence": 0.97,
+      "line": "L01",
+      "line_text": "Caledon Energy"
+    },
+    "business_name": {
+      "value": "Ridgeway Veterinary Clinic Ltd",
+      "confidence": 0.97,
+      "line": "L02",
+      "line_text": "Ridgeway Veterinary Clinic Ltd"
+    },
+    "supply_address": {
+      "value": "221 Ridgeway Road, Sheffield",
+      "confidence": 0.94,
+      "line": "L03",
+      "line_text": "221 Ridgeway Road, Sheffield"
+    },
+    "postcode": {
+      "value": "S11 8PQ",
+      "confidence": 0.97,
+      "line": "L04",
+      "line_text": "S11 8PQ"
+    },
+    "account_number": {
+      "value": "CE-336-5512",
+      "confidence": 0.93,
+      "line": "L05",
+      "line_text": "CE-336-5512"
+    },
+    "mpan": {
+      "value": "1400098765432",
+      "confidence": 0.97,
+      "line": "L06",
+      "line_text": "1400098765432"
+    },
+    "period_start": {
+      "value": "2026-09-01",
+      "confidence": 0.97,
+      "line": "L07",
+      "line_text": "1 September 2026 to 30 September 2026"
+    },
+    "period_end": {
+      "value": "2026-09-30",
+      "confidence": 0.97,
+      "line": "L07",
+      "line_text": "1 September 2026 to 30 September 2026"
+    },
+    "kwh": {
+      "value": "2480",
+      "confidence": 0.97,
+      "line": "L08",
+      "line_text": "2,480 kWh"
+    },
+    "unit_rate_p": {
+      "value": "29.10",
+      "confidence": 0.97,
+      "line": "L09",
+      "line_text": "29.10p per kWh"
+    },
+    "standing_charge_p": {
+      "value": "58.00",
+      "confidence": 0.97,
+      "line": "L10",
+      "line_text": "58.00p per day for 30 days"
+    },
+    "energy_charge": {
+      "value": "721.68",
+      "confidence": 0.97,
+      "line": "L11",
+      "line_text": "Energy charge \u00a3721.68"
+    },
+    "standing_charge_total": {
+      "value": "17.40",
+      "confidence": 0.97,
+      "line": "L12",
+      "line_text": "Standing charge \u00a317.40"
+    },
+    "climate_change_levy": {
+      "value": "19.22",
+      "confidence": 0.97,
+      "line": "L13",
+      "line_text": "Climate change levy \u00a319.22"
+    },
+    "subtotal": {
+      "value": "758.30",
+      "confidence": 0.97,
+      "line": "L14",
+      "line_text": "Subtotal \u00a3758.30"
+    },
+    "vat": {
+      "value": "151.66",
+      "confidence": 0.97,
+      "line": "L15",
+      "line_text": "VAT at 20% \u00a3151.66"
+    },
+    "total": {
+      "value": "909.96",
+      "confidence": 0.97,
+      "line": "L16",
+      "line_text": "Total due \u00a3909.96"
+    },
+    "contract_end_date": {
+      "value": "2027-01-31",
+      "confidence": 0.55,
+      "line": "L17",
+      "line_text": "31 January 2027"
+    }
+  }
+}
