@@ -1,5 +1,5 @@
 """
-The web app: the home page, the bill page, the outbox and the design page.
+The web app: the home page, the bill pages, the walkthrough and the design page.
 Routes do as little as possible. Every change becomes one journal entry that is
 applied and then redirected from, so the work can be read and tested without HTTP.
 Leaves out: sign-in. One demo owner approves everything.
@@ -8,6 +8,7 @@ Leaves out: sign-in. One demo owner approves everything.
 import json
 import logging
 import sqlite3
+from urllib.parse import quote
 
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -18,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from app import approvals, bills, checks, config, db, designdocs, journal, seed, stages, status
+from app import approvals, bills, checks, config, db, designdocs, journal, seed, stages, status, tour
 
 
 @asynccontextmanager
@@ -107,25 +108,25 @@ SAMPLES = [
         "name": "clean",
         "tag": "Straight through",
         "title": "A bill that reads cleanly",
-        "blurb": "Every field read with confidence and every check passes, so it goes straight through to a draft enquiry.",
+        "blurb": "Each field is read with confidence and each check passes, so this one goes straight through to a draft enquiry.",
     },
     {
         "name": "total_mismatch",
         "tag": "Arithmetic",
         "title": "Two digits transposed in the total",
-        "blurb": "The charges add up to one figure and the printed total says another. Arithmetic catches it, not the model.",
+        "blurb": "The charges add up to one figure while the printed total says another, and the arithmetic check is what catches it.",
     },
     {
         "name": "faint_contract_date",
         "tag": "Confidence",
         "title": "A contract date read faintly",
-        "blurb": "The reader is only 55% sure of the contract end date, so the owner is asked instead of guessed at.",
+        "blurb": "The reader is only 55% sure of the contract end date, so the owner is asked about it before anything is drafted.",
     },
     {
         "name": "misread_mpan",
         "tag": "Check digit",
         "title": "A confidently wrong meter number",
-        "blurb": "The reader got one digit wrong and was sure of it. The check digit is what notices.",
+        "blurb": "The reader got one digit of the meter number wrong while being 91% sure of it, and the check digit is what notices.",
     },
 ]
 
@@ -139,8 +140,12 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 
+def home_with(message: str) -> RedirectResponse:
+    return RedirectResponse(f"/?msg={quote(message)}", status_code=303)
+
+
 def go(bill_id: int, message: str = "") -> RedirectResponse:
-    suffix = f"?msg={message}" if message else ""
+    suffix = f"?msg={quote(message)}" if message else ""
     return RedirectResponse(f"/bills/{bill_id}{suffix}", status_code=303)
 
 
@@ -168,7 +173,7 @@ def act(entry: list, data: bytes | None = None) -> RedirectResponse:
     moment = journal.stamp()
     line = [moment, *entry]
     if not journal.fits(line):
-        return RedirectResponse(f"/?msg={journal.FULL}", status_code=303)
+        return home_with(journal.FULL)
 
     conn = get_conn()
     token = db.CLOCK.set(journal.iso(moment))
@@ -188,14 +193,20 @@ def act(entry: list, data: bytes | None = None) -> RedirectResponse:
         conn.close()
 
     if bill_id is None:
-        return RedirectResponse(f"/?msg={message}", status_code=303)
+        return home_with(message)
     return go(bill_id, message)
 
 
 @app.post("/samples/{name}")
 def load_sample(name: str):
     if name not in SAMPLE_BY_NAME:
-        return RedirectResponse("/?msg=There is no such sample.", status_code=303)
+        return home_with("There is no such sample.")
+    # Opening a sample that is already here changes nothing, so it is not journaled.
+    conn = get_conn()
+    existing = bills.by_hash(conn, bills.sha256_of((config.SAMPLES_DIR / f"{name}.html").read_bytes()))
+    conn.close()
+    if existing is not None:
+        return go(existing["id"])
     return act(["sample", name])
 
 
@@ -203,7 +214,7 @@ def load_sample(name: str):
 async def upload(file: UploadFile):
     data = await file.read()
     if not data:
-        return RedirectResponse("/?msg=That file was empty.", status_code=303)
+        return home_with("That file was empty.")
 
     # A sample re-uploaded by hand is still that sample, so the reader knows it.
     digest = bills.sha256_of(data)
@@ -224,8 +235,8 @@ async def upload(file: UploadFile):
 @app.post("/start-over")
 def start_over():
     if journal.start_over():
-        return RedirectResponse("/?msg=Started again with the four sample bills.", status_code=303)
-    return RedirectResponse("/?msg=On a local copy, run make reset to start again.", status_code=303)
+        return home_with("Started again with the four sample bills.")
+    return home_with("On a local copy, run make reset to start again.")
 
 
 def document_html(bill) -> str | None:
@@ -245,7 +256,7 @@ def bill_page(request: Request, bill_id: int, msg: str = ""):
     bill = bills.get(conn, bill_id)
     if bill is None:
         conn.close()
-        return RedirectResponse("/?msg=There is no such bill.", status_code=303)
+        return home_with("There is no such bill.")
 
     done_through = DONE_THROUGH.get(bill["status"], 0)
     stopped = bill["status"] in STOPPED
@@ -296,7 +307,8 @@ def bill_page(request: Request, bill_id: int, msg: str = ""):
         "events": status.events(conn, bill_id),
         "decisions": designdocs.decisions_for(STOPPED_AT.get(bill["status"], current_stage)),
         "date_fields": checks.DATE_FIELDS,
-        "waiting": stages.WAITING.get(bill["status"], ""),
+        "waiting": "" if msg == stages.WAITING.get(bill["status"]) else stages.WAITING.get(bill["status"], ""),
+        "asking": {q["field_name"] for q in stages.open_questions(conn, bill_id)},
         "runnable": bill["status"] in stages.NEXT,
     }
     conn.close()
@@ -343,12 +355,14 @@ def reply(bill_id: int):
     return act(["reply", bill_id])
 
 
-@app.get("/outbox", response_class=HTMLResponse)
-def outbox(request: Request):
-    conn = get_conn()
-    rows = approvals.all_outbox(conn)
-    conn.close()
-    return templates.TemplateResponse(request, "outbox.html", {"rows": rows})
+@app.get("/walkthrough", response_class=HTMLResponse)
+def walkthrough(request: Request):
+    scenes = tour.build()
+    return templates.TemplateResponse(
+        request,
+        "walkthrough.html",
+        {"s": scenes, "beats": tour.beats(scenes), "acts": tour.ACTS, "stage_names": tour.STAGE_NAMES},
+    )
 
 
 @app.get("/design", response_class=HTMLResponse)

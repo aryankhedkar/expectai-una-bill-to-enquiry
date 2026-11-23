@@ -55,7 +55,8 @@ def stage_read(conn: sqlite3.Connection, bill) -> str:
         bill["id"],
         status.READ,
         "reader",
-        f"Read {len(raw['fields'])} fields using {raw.get('model', 'the recorded output')}",
+        f"Read {len(raw['fields'])} fields from "
+        + (f"recorded {raw.get('model', 'model')} output" if raw.get("reader", "recorded") == "recorded" else raw.get("model", "the model")),
     )
     return f"Read {len(raw['fields'])} fields from the bill."
 
@@ -220,7 +221,12 @@ def answer(conn: sqlite3.Connection, bill, question_id: int, action: str, value:
     conn.commit()
     status.log(conn, bill["id"], "customer", detail)
     settle(conn, bill)
-    return detail
+    name = checks.in_sentence(field)
+    if action == "confirm":
+        return f"You confirmed the {name} as {bills.display(field, question['read_value'])}, and the checks have run again."
+    if action == "correct":
+        return f"You corrected the {name} to {bills.display(field, value.strip())}, and the checks have run again."
+    return f"A person will check the {name}, and the bill waits here until they have."
 
 
 # --- Stage 5: enrich -----------------------------------------------------
@@ -400,9 +406,9 @@ NEXT = {
 WAITING = {
     status.NEEDS_ANSWER: "Answer the open questions to carry on.",
     status.AWAITING_APPROVAL: "The enquiry is waiting for the owner to approve it.",
-    status.APPROVED: "Approved. Send the enquiry to carry on.",
-    status.SENT: "Sent. Waiting for a supplier to reply.",
-    status.REPLIED: "A supplier has replied. This is as far as the sketch goes.",
+    status.APPROVED: "The enquiry is approved and ready to send.",
+    status.SENT: "The enquiry has gone out and is waiting for a supplier to reply.",
+    status.REPLIED: "A supplier has replied, which is as far as this sketch goes.",
     status.REJECTED: "The owner rejected this enquiry.",
     status.FAILED: "This bill could not be read.",
 }

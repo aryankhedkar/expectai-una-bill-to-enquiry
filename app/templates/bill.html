@@ -59,10 +59,10 @@
     <section class="reading">
       <header class="stage-head">
         {% if current_number %}
-          <p class="meta">Stage {{ '%02d'|format(current_number) }} of 08</p>
+          <p class="meta">Stage {{ current_number }} of 8</p>
           <h2>{{ current_stage }}</h2>
         {% elif bill.status in ('sent', 'replied') %}
-          <p class="meta">All eight stages done</p>
+          <p class="meta">All eight stages are done</p>
           <h2>{{ 'A supplier replied' if bill.status == 'replied' else 'Sent' }}</h2>
         {% else %}
           <p class="meta">Stopped</p>
@@ -71,18 +71,19 @@
       </header>
 
       {% if bill.status == 'received' %}
-        <p>The file is stored under the hash of its contents. Nothing has been read yet.</p>
+        <p>The file is stored under the SHA-256 hash of its contents, and nothing has been read from it yet.</p>
 
       {% elif bill.status == 'read' %}
         <p>
           The reader returned {{ fields|length }} fields, each with a confidence and the line it
-          came from. None of it has been tested yet.
+          came from, and none of them has been checked yet.
         </p>
 
       {% elif bill.status == 'needs_answer' %}
         <p>
-          {{ open_questions|length }} question{{ '' if open_questions|length == 1 else 's' }} for
-          the owner. The system never fills in a failed or uncertain value by itself.
+          There {{ 'is one question' if open_questions|length == 1 else 'are ' ~ open_questions|length ~ ' questions' }}
+          for the owner here, because the system never fills in a value that failed a check or came
+          back uncertain.
         </p>
         {% for question in open_questions %}
         <form class="query" method="post" action="/bills/{{ bill.id }}/questions/{{ question.id }}">
@@ -97,23 +98,31 @@
           {% if question.status == 'unsure' %}
           <p class="small muted">A person will check this one. You can still answer it.</p>
           {% endif %}
+          {% set failed_check = not question.check_name.startswith('confidence:') %}
           <div class="query-answers">
+            {% if not failed_check %}
             <button type="submit" name="action" value="confirm" class="button">
               Yes, {{ display(question.field_name, question.read_value) }} is right
             </button>
+            {% endif %}
             <div class="query-correct">
               <input type="{{ 'date' if question.field_name in date_fields else 'text' }}"
-                     name="value" placeholder="Or type what the bill says" class="field"
+                     name="value" placeholder="Type what the bill says" class="field"
                      aria-label="The value printed on the bill">
-              <button type="submit" name="action" value="correct" class="button button-secondary">Use this</button>
+              <button type="submit" name="action" value="correct" class="button {{ 'button-secondary' if not failed_check }}">Use this</button>
             </div>
+            {% if failed_check %}
+            <button type="submit" name="action" value="confirm" class="button button-secondary">
+              Keep {{ display(question.field_name, question.read_value) }}, the bill says that
+            </button>
+            {% endif %}
             <button type="submit" name="action" value="unsure" class="button-ghost">I'm not sure</button>
           </div>
         </form>
         {% endfor %}
 
       {% elif bill.status == 'ready' %}
-        <p>Every check either passes or has been settled by the owner. Nothing is guessed at.</p>
+        <p>Each check either passes or has been settled by the owner, so nothing on this bill has been guessed.</p>
 
       {% elif bill.status == 'enriched' and enrichment %}
         <dl class="facts">
@@ -122,8 +131,8 @@
           <div><dt>Contract</dt><dd>Ends in {{ enrichment.days_left }} days, on {{ pretty_date(enrichment.contract_end) }}</dd></div>
         </dl>
         <p class="small">
-          No saving is shown. There is no market price data here, and an invented figure is the
-          fastest way to lose a small business owner.
+          There is no market price data in this sketch, so no saving is shown, because an invented
+          figure is the quickest way to lose an owner's trust.
         </p>
 
       {% elif bill.status in ('awaiting_approval', 'approved', 'sent', 'replied') and payload %}
@@ -160,8 +169,8 @@
         <div class="part">
           <p class="meta part-head">What happens next</p>
           <p>
-            Each supplier replies with a quote. Nothing is switched and no contract is signed.
-            Choosing a quote is a second decision with an approval of its own.
+            Each supplier replies with a quote, and nothing is switched or signed at this point,
+            because choosing a quote is a second decision with its own approval.
           </p>
         </div>
         <form class="part" method="post" action="/bills/{{ bill.id }}/approve">
@@ -178,8 +187,8 @@
           <p class="signed">
             <span class="pin">&#10003;</span>
             <span>
-              Approved by {{ approval.approver }} on {{ when(approval.approved_at) }}. The approval
-              covers version <span class="mono">{{ approval.payload_hash[:8] }}</span>.
+              Approved by {{ approval.approver }} on {{ when(approval.approved_at) }}, and the
+              approval covers version <span class="mono">{{ approval.payload_hash[:8] }}</span>.
             </span>
           </p>
         </div>
@@ -227,10 +236,10 @@
         {% endif %}
 
       {% elif bill.status == 'rejected' %}
-        <p>The owner rejected this enquiry. Nothing was sent, and the timeline below records why.</p>
+        <p>The owner rejected this enquiry, so nothing was sent, and the record below says why.</p>
 
       {% elif bill.status == 'failed' %}
-        <p class="void">This bill could not be read. The timeline below records why.</p>
+        <p class="void">This bill could not be read, and the record below says why.</p>
       {% endif %}
 
       {% if runnable %}
@@ -304,7 +313,9 @@
               <span class="read-was">Read as {{ display(field.name, field.read_value) }}</span>
               {% endif %}
             </span>
-            {% if field.source == 'customer' and field.value == field.read_value %}
+            {% if field.name in asking %}
+              <span class="read-src is-low">Needs you</span>
+            {% elif field.source == 'customer' and field.value == field.read_value %}
               <span class="read-src is-owner">You confirmed</span>
             {% elif field.source == 'customer' %}
               <span class="read-src is-owner">You corrected</span>
@@ -348,7 +359,7 @@
           </ul>
         </details>
         {% endif %}
-        <p class="hint">Plain code, no model. Each check is a function in <code>app/checks.py</code>.</p>
+        <p class="hint">Each check is a small Python function in <code>app/checks.py</code>, and none of them calls a model.</p>
       </section>
       {% endif %}
     </section>
@@ -357,7 +368,7 @@
   <section class="block log" aria-labelledby="log-title">
     <header class="block-head">
       <h3 id="log-title">What happened</h3>
-      <span class="meta">Append-only record</span>
+      <span class="meta">Events are only ever added</span>
     </header>
     <ol>
       {% for event in events %}

@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Walkthrough{% endblock %}
+{% block body_class %}tour{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block content %}
+<div class="tour-stage wrap">
+  <header class="tour-head">
+    <p class="meta">Sample bill, <span class="mono">{{ s.filename }}</span></p>
+    <h1>{{ s.payload.business.name }}, latest electricity bill</h1>
+    <p class="bill-facts">
+      <span class="status" id="t-status">Received</span>
+      <span>{{ s.payload.current_contract.supplier }}</span>
+      <span>{{ s.payload.supply.address }}</span>
+    </p>
+  </header>
+
+  <ol class="stages" id="t-stages" aria-label="The eight stages">
+    {% for name in stage_names %}
+    <li><span class="num">{{ '%02d'|format(loop.index) }}</span><span class="name">{{ name }}</span></li>
+    {% endfor %}
+  </ol>
+
+  <div class="workbench tour-bench">
+    <div class="sheet document" id="t-sheet">{{ s.document_html|safe }}</div>
+
+    <div class="tour-panels">
+
+      {# --- upload --- #}
+      <section class="tour-panel" data-panel="upload" id="p-upload">
+        <p class="meta">Stored on upload</p>
+        <dl class="rows">
+          <div><dt>File</dt><dd class="mono">{{ s.filename }}</dd></div>
+          <div><dt>SHA-256</dt><dd class="mono hash-wrap">{{ s.hash }}</dd></div>
+          <div><dt>Status</dt><dd>Received</dd></div>
+        </dl>
+        <p class="tour-note">The same file uploaded again produces the same hash, and the app opens the bill it already has.</p>
+      </section>
+
+      {# --- read --- #}
+      <section class="tour-panel" data-panel="read" id="p-read">
+        <div class="part-head"><p class="meta">What the reader returned</p><span class="meta">Confidence</span></div>
+        <ul class="read">
+          {% for row in s.read_rows %}
+          <li {% if row.name == 'mpan' %}data-row="mpan"{% endif %}>
+            <span class="read-label">{{ row.label }}</span>
+            <span><span class="read-value-static">{{ row.value }}</span></span>
+            <span class="read-src {{ 'is-low' if row.confidence < s.threshold }}">{{ '%.2f'|format(row.confidence) }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="tour-note">This was read by {{ s.model }} with prompt {{ s.prompt_version }}, and on this demo the output is recorded, so it comes out the same each time.</p>
+      </section>
+
+      {# --- the check digit --- #}
+      <section class="tour-panel" data-panel="digit" id="p-digit">
+        <p class="meta">The meter number's check digit, as read</p>
+        {% set d = s.digit_read %}
+        <div class="digit-grid" role="table" aria-label="Check digit working">
+          <div class="digit-row" role="row"><span class="digit-head" role="rowheader">Digit</span>{% for c in d.columns %}<span role="cell" class="digit {{ 'is-wrong' if loop.index0 == s.wrong_index }}">{{ c.digit }}</span>{% endfor %}<span class="digit last {{ 'is-fail' if not d.passes }}" role="cell">{{ d.actual }}</span></div>
+          <div class="digit-row" role="row"><span class="digit-head" role="rowheader">Weight</span>{% for c in d.columns %}<span role="cell" class="weight">&times;{{ c.weight }}</span>{% endfor %}<span role="cell"></span></div>
+          <div class="digit-row" role="row"><span class="digit-head" role="rowheader">Product</span>{% for c in d.columns %}<span role="cell" class="product">{{ c.product }}</span>{% endfor %}<span role="cell"></span></div>
+        </div>
+        <div class="digit-sum">
+          <div><span class="digit-sum-label">Sum of the products</span><span class="digit-sum-value">{{ '{:,}'.format(d.total) }}</span></div>
+          <div><span class="digit-sum-label">Remainder after dividing by 11</span><span class="digit-sum-value">{{ d.mod11 }}</span></div>
+          <div><span class="digit-sum-label">Remainder of that after dividing by 10</span><span class="digit-sum-value">{{ d.expected }}</span></div>
+          <div class="digit-verdict"><span class="digit-sum-label">The last digit should be {{ d.expected }}, and the number as read ends in {{ d.actual }}</span><span class="check-mark is-fail">Fails</span></div>
+        </div>
+        {% set p = s.digit_printed %}
+        <p class="tour-note">The number printed on the bill, <span class="mono">{{ p.number }}</span>, sums to {{ '{:,}'.format(p.total) }} and passes, so the reader turned digit {{ s.wrong_index + 1 }} from a {{ s.printed[s.wrong_index] }} into a {{ s.mpan_read.value[s.wrong_index] }}.</p>
+      </section>
+
+      {# --- the checks --- #}
+      <section class="tour-panel" data-panel="checks" id="p-checks">
+        <div class="part-head"><p class="meta">The checks after reading</p><span class="meta">{{ s.failing_count }} of {{ s.failing|length }} pass</span></div>
+        <ul class="checks">
+          {% for c in s.failing if not c.name.startswith('confidence:') %}
+          <li class="{{ 'check-pass' if c.passed else 'check-fail' }}">
+            <span class="check-mark">{{ 'Pass' if c.passed else 'Fail' }}</span>
+            <span><span class="check-title">{{ c.title }}</span><span class="check-msg">{{ c.message }}</span></span>
+          </li>
+          {% endfor %}
+          <li class="check-pass">
+            <span class="check-mark">Pass</span>
+            <span><span class="check-title">Confidence in each required field</span><span class="check-msg">Each one was read at {{ '%.2f'|format(s.threshold) }} or above.</span></span>
+          </li>
+        </ul>
+      </section>
+
+      {# --- the question --- #}
+      <section class="tour-panel" data-panel="ask" id="p-ask">
+        <div class="query">
+          <p class="query-meta"><span class="pin pin-query">?</span><span class="meta">Needs your answer</span></p>
+          <p class="query-text">{{ s.question.prompt }}</p>
+          <div class="query-answers">
+            <span class="button" aria-hidden="true">Yes, {{ s.mpan_read.value }} is right</span>
+            <div class="query-correct">
+              <span class="field field-filled" aria-hidden="true">{{ s.printed }}</span>
+              <span class="button button-secondary" aria-hidden="true">Use this</span>
+            </div>
+            <span class="button-ghost" aria-hidden="true">I'm not sure</span>
+          </div>
+        </div>
+      </section>
+
+      {# --- answered --- #}
+      <section class="tour-panel" data-panel="answered" id="p-answered">
+        {% set m = s.answered_rows|selectattr('name', 'equalto', 'mpan')|first %}
+        <p class="meta">The meter number, after the owner answered</p>
+        <dl class="rows rows-wide">
+          <div><dt>Read as</dt><dd class="mono">{{ m.read_value }} <span class="faint">at {{ '%.2f'|format(s.mpan_read.confidence) }}</span></dd></div>
+          <div><dt>Owner says</dt><dd class="mono">{{ m.value }} <span class="read-src is-owner">You corrected</span></dd></div>
+        </dl>
+        <div class="tally">
+          <span class="tally-figure">{{ s.passing_count }}</span>
+          <span class="tally-of">of {{ s.passing|length }} checks pass, and the bill is ready</span>
+        </div>
+      </section>
+
+      {# --- enrich --- #}
+      <section class="tour-panel" data-panel="enrich" id="p-enrich">
+        <p class="meta">What we add to the bill</p>
+        <dl class="facts">
+          <div><dt>Business</dt><dd>{{ s.enrichment.profile.sector }}, {{ s.enrichment.profile.employees }} staff</dd></div>
+          <div><dt>Usage</dt><dd>About {{ '{:,}'.format(s.enrichment.annual_kwh) }} kWh a year</dd></div>
+          <div><dt>Contract</dt><dd>Ends in {{ s.enrichment.days_left }} days, on {{ pretty_date(s.enrichment.contract_end) }}</dd></div>
+        </dl>
+        <div class="runway" aria-hidden="true">
+          <span class="runway-bar"><span style="width: {{ [100, (s.enrichment.days_left / 365 * 100)|round|int]|min }}%"></span></span>
+          <span class="runway-label">Today, 23 November 2026</span><span class="runway-label runway-end">Contract ends, {{ pretty_date(s.enrichment.contract_end) }}</span>
+        </div>
+      </section>
+
+      {# --- draft --- #}
+      <section class="tour-panel" data-panel="draft" id="p-draft">
+        <div class="part-head"><p class="meta">The enquiry, drafted</p><span class="mono">Version {{ s.first_hash[:8] }}</span></div>
+        <div class="letter">{{ s.letter }}</div>
+        <ul class="people">
+          {% for r in s.payload.recipients %}<li><span>{{ r.name }}</span><span class="mono">{{ r.email }}</span></li>{% endfor %}
+        </ul>
+      </section>
+
+      {# --- approve --- #}
+      <section class="tour-panel" data-panel="approve" id="p-approve">
+        <p class="meta">Approval</p>
+        <p class="tick tick-static">
+          <span class="tick-box is-on" aria-hidden="true"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 8.5 3 3 6-7"/></svg></span>
+          <span>I authorise Bill to Enquiry to request quotes from these suppliers on my behalf.</span>
+        </p>
+        <dl class="rows">
+          <div><dt>Approved by</dt><dd>{{ s.payload.business.contact }}</dd></div>
+          <div><dt>Covers version</dt><dd class="mono hash-wrap">{{ s.first_hash }}</dd></div>
+        </dl>
+      </section>
+
+      {# --- edit voids approval --- #}
+      <section class="tour-panel" data-panel="edit" id="p-edit">
+        <p class="meta">What an edit does to the approval</p>
+        <ol class="versions">
+          <li class="version is-void">
+            <span class="mono">{{ s.first_hash[:8] }}</span>
+            <span>Site at {{ s.payload.supply.address }}</span>
+            <span class="version-state">Approved, now void</span>
+          </li>
+          <li class="version-arrow" aria-hidden="true">The owner adds a unit number to the address</li>
+          <li class="version">
+            <span class="mono">{{ s.second_hash[:8] }}</span>
+            <span>Site at Unit 4, 3 Mill Street, Manchester</span>
+            <span class="version-state is-pen">Waiting for a fresh approval</span>
+          </li>
+        </ol>
+      </section>
+
+      {# --- send --- #}
+      <section class="tour-panel" data-panel="send" id="p-send">
+        <div class="part-head"><p class="meta">The outbox</p><span class="mono">Key: enquiry, supplier, hash</span></div>
+        <ul class="people">
+          {% for row in s.outbox %}<li><span>{{ row.recipient }}</span><span class="mono">{{ row.payload_hash[:8] }}</span></li>{% endfor %}
+        </ul>
+        <div class="tally">
+          <span class="tally-figure">{{ s.outbox|length }}</span>
+          <span class="tally-of">rows after pressing send twice, because the second send found each row already written</span>
+        </div>
+      </section>
+
+      {# --- the record --- #}
+      <section class="tour-panel" data-panel="log" id="p-log">
+        <p class="meta">What happened, in order</p>
+        <ol class="tour-log">
+          {% for e in s.events %}
+          <li>
+            <span class="log-time">{{ when(e.at) }}</span>
+            <span class="log-detail">{{ e.detail }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="caption" id="caption" aria-live="polite" hidden>
+  <div class="cap-chrome">
+    <div class="acts" id="acts">
+      {% for act in acts %}<span data-act="{{ loop.index0 }}">{{ act }}</span>{% if not loop.last %}<i aria-hidden="true"></i>{% endif %}{% endfor %}
+    </div>
+    <span class="cap-count" id="cap-count"></span>
+  </div>
+  <h2 class="cap-title" id="cap-title"></h2>
+  <p class="cap-body" id="cap-body"></p>
+  <div class="cap-foot">
+    <button class="button-ghost" id="cap-back" type="button">Back</button>
+    <button class="button" id="cap-next" type="button">Next</button>
+  </div>
+</div>
+
+<div class="curtain" id="intro">
+  <div class="curtain-inner">
+    <img class="curtain-mark" src="/static/brand/expectai-wordmark.svg" alt="ExpectAI" width="99" height="24">
+    <p class="meta">A walkthrough of Bill to Enquiry</p>
+    <h1>From an electricity bill to a quote request the owner has approved</h1>
+    <p class="curtain-lede">
+      We follow one sample bill through the app's own code, from the moment it is uploaded to the
+      moment the enquiry goes out, and we stop for longest on the two places where the design
+      matters most, which are trusting what was read and getting the owner's approval.
+    </p>
+    <button class="button button-large" id="start" type="button">Start</button>
+    <p class="curtain-hint">About five minutes, and the arrow keys work too</p>
+  </div>
+</div>
+
+<div class="curtain hidden" id="ending">
+  <div class="curtain-inner curtain-wide">
+    <img class="curtain-mark" src="/static/brand/expectai-wordmark.svg" alt="ExpectAI" width="99" height="24">
+    <p class="meta">What I would do in the first week</p>
+    <h1>Put real bills through it before automating anything</h1>
+    <ol class="asks">
+      <li><span class="asks-n">01</span><p class="asks-h">Start with the common suppliers</p><p>I would take bills from the two or three suppliers most common among current customers, because unusual layouts are where reading fails first.</p></li>
+      <li><span class="asks-n">02</span><p class="asks-h">Check the first fifty by hand</p><p>A person checks each extraction for the first fifty bills, and we measure accuracy per field before reducing the checking.</p></li>
+      <li><span class="asks-n">03</span><p class="asks-h">Keep an evaluation set</p><p>That grows into 100 to 200 real bills with the right answers written down, run on each change to the prompt or the model.</p></li>
+    </ol>
+    <div class="curtain-actions">
+      <a class="button" href="/">Open the app</a>
+      <a class="arrow-link" href="/design">Read the design</a>
+      <button class="button-ghost" id="replay" type="button">Watch again</button>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="beats">{{ beats|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}<script src="/static/walkthrough.js?v=1"></script>{% endblock %}

@@ -57,7 +57,7 @@ def approve(conn: sqlite3.Connection, bill, approver: str) -> str:
 def reject(conn: sqlite3.Connection, bill, reason: str) -> str:
     reason = reason.strip() or "No reason given"
     status.transition(conn, bill["id"], status.REJECTED, "customer", f"Rejected: {reason}")
-    return f"Rejected. {reason}"
+    return "The enquiry was rejected, and the reason is in the record below."
 
 
 def edit_value(conn: sqlite3.Connection, bill, field: str, value: str) -> str:
@@ -148,13 +148,13 @@ def send(conn: sqlite3.Connection, bill) -> str:
             conn, bill["id"], status.SENT, "system",
             f"Sent to {written} suppliers, hash {enquiry['payload_hash'][:12]}",
         )
-        return f"Sent to {written} suppliers. The outbox holds {total} rows."
+        return f"The enquiry went to {written} suppliers, and the outbox now holds {total} rows."
 
     status.log(
         conn, bill["id"], "system",
         "Send ran again and wrote nothing, because this enquiry has already gone to these suppliers",
     )
-    return f"Nothing new was sent. The outbox still holds {total} rows."
+    return f"Sending again wrote nothing new, so the outbox still holds {total} rows."
 
 
 def replies_for(conn: sqlite3.Connection, bill_id: int):
@@ -167,6 +167,8 @@ def simulate_reply(conn: sqlite3.Connection, bill) -> str:
     rows = outbox_for(conn, bill["id"])
     if not rows:
         return "Nothing has been sent, so there is nothing to reply to."
+    if replies_for(conn, bill["id"]):
+        return "A supplier has already replied to this enquiry."
     recipient = rows[0]["recipient"]
     conn.execute(
         "INSERT INTO replies (bill_id, recipient, body, created_at) VALUES (?, ?, ?, ?)",
@@ -174,4 +176,4 @@ def simulate_reply(conn: sqlite3.Connection, bill) -> str:
     )
     conn.commit()
     status.transition(conn, bill["id"], status.REPLIED, "system", f"Reply from {recipient}")
-    return f"{recipient} replied. A real quote would start a second decision, with its own approval."
+    return f"{recipient} replied with a quote, and choosing it would be a second decision with its own approval."

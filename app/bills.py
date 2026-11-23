@@ -22,6 +22,8 @@ def by_hash(conn: sqlite3.Connection, digest: str):
 
 
 def get(conn: sqlite3.Connection, bill_id: int):
+    if not 0 < bill_id < 2**63:
+        return None
     return conn.execute("SELECT * FROM bills WHERE id = ?", (bill_id,)).fetchone()
 
 

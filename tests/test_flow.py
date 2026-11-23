@@ -252,3 +252,52 @@ def test_a_typed_number_that_is_not_a_number_is_refused(client):
     page = client.post(f"/bills/{bill_id}/edit", data={"field": "kwh", "value": "12000 kWh"}).text
     assert "needs to be a number" in page
     assert status_of(bill_id) == status.AWAITING_APPROVAL
+
+
+def test_the_walkthrough_runs_the_sample_through_the_real_stages(client):
+    from app import tour
+
+    scenes = tour.build()
+    assert not scenes["digit_read"]["passes"]
+    assert scenes["digit_printed"]["passes"]
+    assert scenes["passing_count"] == len(scenes["passing"])
+    assert scenes["first_hash"] != scenes["second_hash"]
+    assert len(scenes["outbox"]) == 3
+
+    page = client.get("/walkthrough")
+    assert page.status_code == 200
+    assert page.text.count('class="tour-panel"') == len({b["panel"] for b in tour.beats(scenes)})
+
+
+def test_notices_keep_characters_that_mean_something_in_a_url(client):
+    bill_id = open_sample(client, "clean")
+    client.post(f"/bills/{bill_id}/run")
+    page = client.post(f"/bills/{bill_id}/edit", data={"field": "business_name", "value": "Smith & Sons #2"}).text
+    assert "Smith &amp; Sons #2" in page
+
+
+def test_a_huge_bill_number_is_not_a_server_error(client):
+    response = client.get(f"/bills/{2**70}")
+    assert response.status_code == 200
+    assert "There is no such bill" in response.text
+
+
+def test_an_absurd_figure_is_refused(client):
+    bill_id = open_sample(client, "clean")
+    client.post(f"/bills/{bill_id}/run")
+    page = client.post(f"/bills/{bill_id}/edit", data={"field": "kwh", "value": "1e308"}).text
+    assert "needs to be a number between" in page
+    page = client.post(f"/bills/{bill_id}/edit", data={"field": "contract_end_date", "value": "9999-12-31"}).text
+    assert "needs to be a date between" in page
+
+
+def test_a_supplier_replies_once(client):
+    bill_id = open_sample(client, "clean")
+    client.post(f"/bills/{bill_id}/run")
+    approve_and_send(client, bill_id)
+    client.post(f"/bills/{bill_id}/reply")
+    page = client.post(f"/bills/{bill_id}/reply").text
+    assert "already replied" in page
+    conn = db.connect()
+    assert len(approvals.replies_for(conn, bill_id)) == 1
+    conn.close()

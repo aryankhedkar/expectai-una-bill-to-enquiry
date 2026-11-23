@@ -76,6 +76,12 @@ def label(field: str) -> str:
     return FIELD_LABELS.get(field, field.replace("_", " ").capitalize())
 
 
+def in_sentence(field: str) -> str:
+    """A label as it reads mid-sentence: only the first letter drops, so MPAN stays MPAN."""
+    text = label(field)
+    return text[:1].lower() + text[1:]
+
+
 def number(text) -> float | None:
     """Read a figure that may carry a pound sign, commas or a p for pence."""
     if text is None:
@@ -91,10 +97,12 @@ def problem_with(field: str, value: str) -> str | None:
     """Why a value the owner typed cannot be used, or None if it can."""
     if field in NUMBER_FIELDS:
         figure = number(value)
-        if figure is None or not math.isfinite(figure) or figure < 0:
-            return f"{label(field)} needs to be a number, such as 412.80."
-    if field in DATE_FIELDS and parse_date(value) is None:
-        return f"{label(field)} needs to be a date, written as 2027-03-31."
+        if figure is None or not math.isfinite(figure) or figure < 0 or figure > 10_000_000:
+            return f"{label(field)} needs to be a number between 0 and 10,000,000, such as 412.80."
+    if field in DATE_FIELDS:
+        parsed = parse_date(value)
+        if parsed is None or not 2000 <= parsed.year <= 2100:
+            return f"{label(field)} needs to be a date between 2000 and 2100, written as 2027-03-31."
     return None
 
 
@@ -301,7 +309,7 @@ def check_confidence(field: str, confidence: float, value) -> CheckResult:
         return CheckResult(name, title, True, f"Read with {confidence:.0%} confidence.", (field,))
     return CheckResult(
         name, title, False,
-        f"We read {label(field).lower()} as {shown} but are only {confidence:.0%} sure of it.",
+        f"We read the {in_sentence(field)} as {shown}, but we are only {confidence:.0%} sure of it.",
         (field,),
     )
 

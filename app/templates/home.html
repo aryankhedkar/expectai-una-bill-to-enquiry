@@ -4,17 +4,17 @@
 <section class="wrap opening">
   <div>
     <p class="meta">A design sketch for ExpectAI</p>
-    <h1 class="display">From an energy bill to an enquiry the owner <span class="mark">approved</span>.</h1>
+    <h1 class="display">From an energy bill to an enquiry the owner approved</h1>
     <p class="lead">
-      A small business uploads an electricity bill. The system reads it, checks what it read,
-      asks about anything it is unsure of, drafts a quote request to suppliers, waits for
-      approval, and sends it once.
+      When a small business uploads an electricity bill, this reads it, checks what it read, and
+      asks the owner about anything it isn't sure of before it drafts a quote request to
+      suppliers and sends it once the owner has approved it.
     </p>
     <div class="actions">
+      <a class="button" href="/walkthrough">Start the walkthrough</a>
       <form method="post" action="/samples/clean">
-        <button type="submit" class="button">Open the clean bill</button>
+        <button type="submit" class="button button-secondary">Open a bill yourself</button>
       </form>
-      <a class="arrow-link" href="/design">Read the design</a>
     </div>
   </div>
 
@@ -31,15 +31,12 @@
       </dl>
     </div>
     <ol class="specimen-notes">
-      <li><span class="pin">1</span><p><strong>The check digit agrees.</strong> The first twelve digits, weighted and summed, give the thirteenth.</p></li>
-      <li><span class="pin">2</span><p><strong>The sums agree.</strong> £758.30 of charges and £151.66 of VAT make £909.96.</p></li>
-      <li><span class="pin pin-query">3</span><p><strong>Read at 55% confidence.</strong> Too faint to trust, so the owner is asked.</p></li>
+      <li><span class="pin">1</span><p>The meter number passes its check digit, which is worked out from the first twelve digits.</p></li>
+      <li><span class="pin">2</span><p>The £758.30 of charges and £151.66 of VAT add up to the £909.96 total.</p></li>
+      <li><span class="pin pin-query">3</span><p>The contract date came back at 55% confidence, so the owner is asked about it.</p></li>
     </ol>
     <figcaption>
-      <p class="meta">Fig. 1 &middot; The model reads, code checks, the owner decides</p>
-      <form method="post" action="/samples/faint_contract_date" class="specimen-open">
-        <button type="submit" class="link link-pen">Open this bill</button>
-      </form>
+      <p class="meta">How the checks read one of the four sample bills</p>
     </figcaption>
   </figure>
 </section>
@@ -49,26 +46,28 @@
 <section class="wrap section" aria-labelledby="journey-title">
   <header class="section-head">
     <p class="meta">The journey</p>
-    <h2 id="journey-title">Eight stages from upload to send.</h2>
+    <h2 id="journey-title">Eight stages, with the care going into two of them</h2>
   </header>
-  <ol class="journey">
+  <div class="pipeline-brackets" aria-hidden="true">
+    <span class="bracket bracket-read">Trusting what was read</span>
+    <span class="bracket bracket-approve">Getting the owner's approval</span>
+  </div>
+  <ol class="pipeline">
     {% set journey = [
-      ('Upload', 'Stored under the hash of its contents, so the same bill twice is one bill.'),
-      ('Read', 'Every field arrives with a confidence and the line it came from.'),
-      ('Check', 'Sums, formats, dates and the meter check digit, in plain code.'),
-      ('Ask', 'Anything that fails or is uncertain becomes one question for the owner.'),
-      ('Enrich', 'Annual usage and the days left on the contract.'),
-      ('Draft', 'A template filled with checked values only.'),
-      ('Approve', 'Tied to a hash of exactly what will be sent.'),
-      ('Send', 'Once, however many times it is retried.'),
+      ('Upload', 'Stored under its SHA-256 hash', false),
+      ('Read', 'Fields with a confidence and a source line', true),
+      ('Check', 'Twenty rules in plain Python', true),
+      ('Ask', 'Questions for anything uncertain', true),
+      ('Enrich', 'Annual usage, days left on the contract', false),
+      ('Draft', 'A template filled with checked values', false),
+      ('Approve', 'Tied to a hash of what is sent', true),
+      ('Send', 'Once, however often it is retried', true),
     ] %}
-    {% for name, line in journey %}
-    <li>
-      <span class="num">{{ '%02d'|format(loop.index) }}</span>
-      <div>
-        <p class="journey-name">{{ name }}</p>
-        <p class="journey-line">{{ line }}</p>
-      </div>
+    {% for name, line, hard in journey %}
+    <li class="pipe {{ 'is-hard' if hard }}">
+      <span class="pipe-n">{{ '%02d'|format(loop.index) }}</span>
+      <span class="pipe-name">{{ name }}</span>
+      <span class="pipe-what">{{ line }}</span>
     </li>
     {% endfor %}
   </ol>
@@ -77,7 +76,7 @@
 <section class="wrap section" aria-labelledby="samples-title">
   <header class="section-head">
     <p class="meta">Sample bills</p>
-    <h2 id="samples-title">Four bills. Three carry a planted error.</h2>
+    <h2 id="samples-title">Four sample bills, three of them with a planted error</h2>
   </header>
   <ul class="exhibits">
     {% for sample in samples %}
@@ -101,25 +100,32 @@
 <section class="wrap section upload" aria-labelledby="upload-title">
   <header class="section-head">
     <p class="meta">Upload</p>
-    <h2 id="upload-title">Try the duplicate check.</h2>
+    <h2 id="upload-title">Upload a sample twice to see the duplicate check</h2>
     <p>
-      Upload a sample file you already opened. It is hashed, the hash is already here, and no
-      second bill is created. Any other file is accepted and then stops at the reading stage,
-      because demo mode replays recorded output for the samples only.
+      The file is hashed on arrival, so a sample you have already opened is recognised and no
+      second bill is made. Any other file is accepted and then stops at reading, because demo
+      mode only has recorded output for the four samples.
     </p>
   </header>
   <form class="dropzone" method="post" action="/upload" enctype="multipart/form-data">
     <input type="file" name="file" id="file" required aria-label="Choose a bill to upload">
-    <span class="meta">Drop a file here or click to choose</span>
-    <span class="dropzone-text" data-empty="No file chosen yet.">No file chosen yet.</span>
+    <span class="meta">Drop a file here or click to choose one</span>
+    <span class="dropzone-text" data-empty="No file chosen yet">No file chosen yet</span>
     <button type="submit" class="button button-secondary" id="upload-button">Upload</button>
   </form>
 </section>
 
 <section class="wrap section" aria-labelledby="bills-title">
-  <header class="section-head">
-    <p class="meta">On this copy</p>
-    <h2 id="bills-title">Bills</h2>
+  <header class="section-head section-head-row">
+    <div>
+      <p class="meta">On this copy</p>
+      <h2 id="bills-title">Bills</h2>
+    </div>
+    {% if hosted %}
+    <form method="post" action="/start-over">
+      <button type="submit" class="link">Start over with the four samples</button>
+    </form>
+    {% endif %}
   </header>
   {% if bills %}
   <ul class="ledger">
@@ -139,8 +145,8 @@
   </ul>
   {% else %}
   <div class="ledger ledger-empty">
-    <h3>No bills yet.</h3>
-    <p class="muted">Open one of the four samples above and it will be listed here.</p>
+    <h3>There are no bills here yet</h3>
+    <p class="muted">Open one of the four samples above and it will appear in this list.</p>
   </div>
   {% endif %}
 </section>

@@ -11,10 +11,10 @@
   <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
   <link rel="preload" href="/static/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/static/style.css?v=3">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 {% set path = request.url.path %}
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <header class="masthead">
     <div class="wrap masthead-row">
       <a class="brand" href="/" aria-label="Bill to Enquiry, a sketch for ExpectAI">
@@ -23,36 +23,30 @@
         <span class="brand-name">Bill to Enquiry</span>
       </a>
       <nav class="nav" aria-label="Main">
+        <a href="/walkthrough" {% if path.startswith('/walkthrough') %}aria-current="page"{% endif %}>Walkthrough</a>
         <a href="/" {% if path == '/' or path.startswith('/bills') %}aria-current="page"{% endif %}>Bills</a>
         <a href="/design" {% if path.startswith('/design') %}aria-current="page"{% endif %}>Design</a>
-        <a href="/outbox" {% if path.startswith('/outbox') %}aria-current="page"{% endif %}>Outbox</a>
       </nav>
     </div>
-    {% if hosted %}
-    <div class="hosted">
-      <form class="wrap hosted-row" method="post" action="/start-over">
-        <span class="meta">Hosted demo</span>
-        <p>Each visitor has their own copy, kept in a cookie for a week.</p>
-        <button type="submit" class="link link-pen">Start over</button>
-      </form>
-    </div>
-    {% endif %}
   </header>
 
   <main>{% block content %}{% endblock %}</main>
 
+  {% block footer %}
   <footer class="wrap colophon">
     <div class="colophon-row">
       <span class="meta">Colophon</span>
       <p>
-        A design sketch prepared for a conversation with ExpectAI. It is not an ExpectAI product.
-        Every business, supplier and meter number is invented, and the demo treats
-        {{ today.strftime('%d %B %Y').lstrip('0') }} as today.
+        I made this sketch for a conversation with ExpectAI, so it carries their wordmark, but it
+        is not an ExpectAI product. The businesses, suppliers and meter numbers are all invented,
+        and the app treats {{ today.strftime('%d %B %Y').lstrip('0') }} as today so the checks give
+        the same answer whenever it is opened.
       </p>
-      <span class="meta">Newsreader, Geist, Geist Mono</span>
+      <span class="meta">Set in Newsreader and Geist</span>
     </div>
   </footer>
+  {% endblock %}
 
-  <script src="/static/app.js?v=3"></script>
+  {% block scripts %}<script src="/static/app.js?v=4"></script>{% endblock %}
 </body>
 </html>

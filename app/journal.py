@@ -38,6 +38,9 @@ SMALL_UPLOAD_BYTES = 300
 # rebuilt from their cookie if that visitor comes back.
 MAX_VISITOR_FILES = 400
 
+# No journal line or visitor id can claim a time before 1 January 2026 or after tomorrow.
+EARLIEST = 1_767_225_600
+
 # What each kind of entry carries, checked before anything from a cookie is replayed.
 OPTIONAL_TEXT = (str, type(None))
 SHAPES = {
@@ -237,7 +240,7 @@ def from_cookies(cookies: dict) -> Visitor:
     vid = cookies.get(VISITOR_COOKIE, "")
     if re.fullmatch(r"[0-9a-f]{20}", vid):
         arrived = int(vid[:8], 16)
-        if 1_767_225_600 <= arrived <= stamp() + 86_400:  # from 1 January 2026 to tomorrow
+        if EARLIEST <= arrived <= stamp() + 86_400:
             return Visitor(vid=vid, lines=lines)
     # No usable id. Keep any journal the browser still holds, under a fresh id.
     return Visitor(vid=new_vid(), lines=lines, is_new=True)
@@ -264,6 +267,7 @@ def decode(text: str) -> list:
             isinstance(line, list)
             and len(line) >= 2
             and isinstance(line[0], int)
+            and EARLIEST <= line[0] <= stamp() + 86_400
             and well_formed(line[1:])
         ):
             return []
@@ -296,6 +300,18 @@ def prepare(visitor: Visitor) -> None:
     for path in (visitor.db_path, visitor.marker):
         path.unlink(missing_ok=True)
 
+    try:
+        _rebuild(visitor)
+    except Exception:  # noqa: BLE001 - a journal that cannot be replayed is dropped
+        visitor.lines = []
+        visitor.changed = True
+        for path in (visitor.db_path, visitor.marker):
+            path.unlink(missing_ok=True)
+        _rebuild(visitor)
+    visitor.marker.write_text(fingerprint(visitor))
+
+
+def _rebuild(visitor: Visitor) -> None:
     conn = db.connect(visitor.db_path)
     db.setup(conn)
     token = db.CLOCK.set(iso(visitor.arrived))
@@ -311,7 +327,6 @@ def prepare(visitor: Visitor) -> None:
     finally:
         db.CLOCK.reset(token)
         conn.close()
-    visitor.marker.write_text(wanted)
 
 
 def settle(visitor: Visitor) -> None:

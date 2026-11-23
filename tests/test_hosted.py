@@ -67,11 +67,11 @@ def test_a_visitor_keeps_their_place_when_every_request_lands_somewhere_new(host
         client.post(f"/bills/{bill_id}/send")
         new_instance(hosted)
         page = client.post(f"/bills/{bill_id}/send").text
-        assert "Nothing new was sent" in page
+        assert "Sending again wrote nothing new" in page
 
         new_instance(hosted)
-        outbox = client.get("/outbox").text
-        assert outbox.count("total_mismatch.html") == 3
+        page = client.get(f"/bills/{bill_id}").text
+        assert "3 rows" in page
 
 
 def test_two_visitors_do_not_see_each_other(hosted):
@@ -228,3 +228,33 @@ def test_a_local_run_writes_no_cookies(tmp_path, monkeypatch):
     with TestClient(main.app) as client:
         response = client.post("/samples/clean", follow_redirects=False)
         assert "set-cookie" not in response.headers
+
+
+def test_a_journal_line_with_an_impossible_time_is_ignored(hosted):
+    with visitor_client() as client:
+        client.get("/")
+        forged = [[10**15, "next", 1], [-5, "next", 1]]
+        client.cookies.set(journal.JOURNAL_COOKIE, journal.encode(forged))
+        assert client.get("/").status_code == 200
+        assert client.post("/start-over").status_code == 200
+
+
+def test_a_journal_that_cannot_be_replayed_falls_back_to_the_samples(hosted, monkeypatch):
+    with visitor_client() as client:
+        client.get("/")
+        client.post("/bills/1/run")
+        new_instance(hosted)
+        monkeypatch.setattr(journal, "_rebuild", _fails_once(journal._rebuild))
+        assert pill(client.get("/bills/1").text) == "Received"
+
+
+def _fails_once(real):
+    calls = []
+
+    def wrapped(visitor):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("replay fell over")
+        return real(visitor)
+
+    return wrapped
