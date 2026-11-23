@@ -138,7 +138,17 @@ code {
   text-align: center;
   text-wrap: balance;
 }
-.hosted-note code { font-size: 11px; white-space: nowrap; }
+.hosted-reset {
+  appearance: none;
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 0 0 0 4px;
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hosted-reset:hover { text-decoration: underline; text-underline-offset: 3px; }
 .hosted-dot {
   display: inline-block;
   vertical-align: middle;

@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # On a serverless host the project folder is read only and /tmp is the only
 # place a file can be written. That /tmp belongs to one instance and is wiped
-# when the instance goes, so the hosted copy is a demo and not a record.
+# when the instance goes, so each visitor's changes also travel in a cookie and
+# an instance that has not seen them replays them (app/journal.py).
 HOSTED = bool(os.environ.get("VERCEL"))
 DEMO_SEED = os.environ.get("DEMO_SEED") == "1"
 

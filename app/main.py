@@ -1,7 +1,7 @@
 """
 The web app: the home page, the bill page, the outbox and the design page.
-Routes do as little as possible. Each one calls into a stage module and then
-redirects, so the work can be read and tested without going through HTTP.
+Routes do as little as possible. Every change becomes one journal entry that is
+applied and then redirected from, so the work can be read and tested without HTTP.
 Leaves out: sign-in. One demo owner approves everything.
 """
 
@@ -15,8 +15,9 @@ from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
-from app import approvals, bills, checks, config, db, designdocs, seed, stages, status
+from app import approvals, bills, checks, config, db, designdocs, journal, seed, stages, status
 
 
 @asynccontextmanager
@@ -26,6 +27,30 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Bill to Enquiry", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def keep_the_visitors_place(request: Request, call_next):
+    """
+    On a hosted copy, point this request at the visitor's own database and bring it up
+    to date from their journal first. A local run skips all of this.
+    """
+    if not config.HOSTED or request.url.path.startswith("/static"):
+        return await call_next(request)
+
+    visitor = journal.from_cookies(request.cookies)
+    async with journal.lock_for(visitor):
+        await run_in_threadpool(journal.prepare, visitor)
+        visitor_token = journal.CURRENT.set(visitor)
+        db_token = db.VISITOR_DB.set(visitor.db_path)
+        try:
+            response = await call_next(request)
+        finally:
+            db.VISITOR_DB.reset(db_token)
+            journal.CURRENT.reset(visitor_token)
+        await run_in_threadpool(journal.settle, visitor)
+    journal.write_cookies(visitor, response)
+    return response
 app.mount("/static", StaticFiles(directory=config.ROOT / "app" / "static"), name="static")
 templates = Jinja2Templates(directory=str(config.ROOT / "app" / "templates"))
 
@@ -126,15 +151,22 @@ def home(request: Request, msg: str = ""):
     )
 
 
+def act(entry: list, data: bytes | None = None) -> RedirectResponse:
+    """Apply one change, add it to the visitor's journal, and show the bill it touched."""
+    conn = get_conn()
+    bill_id, message = journal.apply(conn, entry, data)
+    conn.close()
+    journal.record(entry)
+    if bill_id is None:
+        return RedirectResponse(f"/?msg={message}", status_code=303)
+    return go(bill_id, message)
+
+
 @app.post("/samples/{name}")
 def load_sample(name: str):
-    if name not in {s["name"] for s in SAMPLES}:
+    if name not in SAMPLE_BY_NAME:
         return RedirectResponse("/?msg=There is no such sample.", status_code=303)
-    conn = get_conn()
-    bill, created = bills.create_from_sample(conn, name)
-    conn.close()
-    message = "" if created else "We already have this bill, so no second copy was made."
-    return go(bill["id"], message)
+    return act(["sample", name])
 
 
 @app.post("/upload")
@@ -143,17 +175,23 @@ async def upload(file: UploadFile):
     if not data:
         return RedirectResponse("/?msg=That file was empty.", status_code=303)
 
-    conn = get_conn()
     # A sample re-uploaded by hand is still that sample, so the reader knows it.
+    digest = bills.sha256_of(data)
     sample_name = None
     for sample in SAMPLES:
         path = config.SAMPLES_DIR / f"{sample['name']}.html"
-        if path.exists() and bills.sha256_of(path.read_bytes()) == bills.sha256_of(data):
+        if path.exists() and bills.sha256_of(path.read_bytes()) == digest:
             sample_name = sample["name"]
-    bill, created = bills.create(conn, file.filename or "upload.html", data, sample_name)
-    conn.close()
-    message = "" if created else "We already have this bill, so no second copy was made."
-    return go(bill["id"], message)
+    filename = file.filename or "upload.html"
+    entry = journal.upload_entry(filename, sample_name, data)
+    return await run_in_threadpool(act, entry, data)
+
+
+@app.post("/start-over")
+def start_over():
+    if journal.start_over():
+        return RedirectResponse("/?msg=Started again with the four sample bills.", status_code=303)
+    return RedirectResponse("/?msg=On a local copy, run make reset to start again.", status_code=303)
 
 
 def document_html(bill) -> str | None:
@@ -233,77 +271,42 @@ def bill_page(request: Request, bill_id: int, msg: str = ""):
 
 @app.post("/bills/{bill_id}/next")
 def next_stage(bill_id: int):
-    conn = get_conn()
-    bill = bills.get(conn, bill_id)
-    message = stages.run_next(conn, bill)
-    conn.close()
-    return go(bill_id, message)
+    return act(["next", bill_id])
 
 
 @app.post("/bills/{bill_id}/run")
 def run_to_approval(bill_id: int):
-    conn = get_conn()
-    bill = bills.get(conn, bill_id)
-    message = stages.run_to_approval(conn, bill)
-    conn.close()
-    return go(bill_id, message)
+    return act(["run", bill_id])
 
 
 @app.post("/bills/{bill_id}/questions/{question_id}")
 def answer_question(bill_id: int, question_id: int, action: str = Form(...), value: str = Form("")):
-    conn = get_conn()
-    bill = bills.get(conn, bill_id)
-    message = stages.answer(conn, bill, question_id, action, value)
-    conn.close()
-    return go(bill_id, message)
+    return act(["answer", bill_id, question_id, action, value])
 
 
 @app.post("/bills/{bill_id}/approve")
 def approve(bill_id: int, approver: str = Form("The owner"), authority: str = Form("")):
-    conn = get_conn()
-    bill = bills.get(conn, bill_id)
-    if authority != "yes":
-        conn.close()
-        return go(bill_id, "Tick the authority box before approving.")
-    message = approvals.approve(conn, bill, approver)
-    conn.close()
-    return go(bill_id, message)
+    return act(["approve", bill_id, approver, authority])
 
 
 @app.post("/bills/{bill_id}/edit")
 def edit(bill_id: int, field: str = Form(...), value: str = Form("")):
-    conn = get_conn()
-    bill = bills.get(conn, bill_id)
-    message = approvals.edit_value(conn, bill, field, value)
-    conn.close()
-    return go(bill_id, message)
+    return act(["edit", bill_id, field, value])
 
 
 @app.post("/bills/{bill_id}/reject")
 def reject(bill_id: int, reason: str = Form("")):
-    conn = get_conn()
-    bill = bills.get(conn, bill_id)
-    message = approvals.reject(conn, bill, reason)
-    conn.close()
-    return go(bill_id, message)
+    return act(["reject", bill_id, reason])
 
 
 @app.post("/bills/{bill_id}/send")
 def send(bill_id: int):
-    conn = get_conn()
-    bill = bills.get(conn, bill_id)
-    message = approvals.send(conn, bill)
-    conn.close()
-    return go(bill_id, message)
+    return act(["send", bill_id])
 
 
 @app.post("/bills/{bill_id}/reply")
 def reply(bill_id: int):
-    conn = get_conn()
-    bill = bills.get(conn, bill_id)
-    message = approvals.simulate_reply(conn, bill)
-    conn.close()
-    return go(bill_id, message)
+    return act(["reply", bill_id])
 
 
 @app.get("/outbox", response_class=HTMLResponse)

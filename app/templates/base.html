@@ -29,11 +29,11 @@
   </header>
 
   {% if hosted %}
-  <p class="hosted-note">
+  <form class="hosted-note" method="post" action="/start-over">
     <span class="hosted-dot" aria-hidden="true"></span>
-    Hosted demo. Data lives on one short-lived server and resets from time to time.
-    Run <code>make run</code> locally for a copy that keeps what you do.
-  </p>
+    Hosted demo. Each visitor gets their own copy, kept in a cookie for a week.
+    <button type="submit" class="hosted-reset">Start over</button>
+  </form>
   {% endif %}
 
   <main class="{% block main_class %}page{% endblock %}">{% block content %}{% endblock %}</main>
