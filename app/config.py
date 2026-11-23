@@ -10,7 +10,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-DATA_DIR = ROOT / "data"
+# On a serverless host the project folder is read only and /tmp is the only
+# place a file can be written. That /tmp belongs to one instance and is wiped
+# when the instance goes, so the hosted copy is a demo and not a record.
+HOSTED = bool(os.environ.get("VERCEL"))
+DEMO_SEED = os.environ.get("DEMO_SEED") == "1"
+
+DATA_DIR = Path("/tmp/bill-to-enquiry") if HOSTED else ROOT / "data"
 DB_PATH = DATA_DIR / "app.db"
 UPLOAD_DIR = DATA_DIR / "uploads"
 

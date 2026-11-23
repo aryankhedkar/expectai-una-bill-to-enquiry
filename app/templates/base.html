@@ -16,6 +16,14 @@
     </nav>
   </header>
 
+  {% if hosted %}
+  <p class="hosted-note">
+    This hosted copy keeps its data on one short lived instance, so bills reset
+    whenever the instance is replaced and two visitors do not share a view. Clone the
+    repository and run <code>make run</code> for a copy that keeps what you do.
+  </p>
+  {% endif %}
+
   <main>{% block content %}{% endblock %}</main>
 
   <footer class="site">

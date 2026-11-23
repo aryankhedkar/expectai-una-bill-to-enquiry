@@ -36,6 +36,16 @@ header.site nav a:hover { color: var(--accent); }
 
 main { max-width: 1180px; margin: 0 auto; padding: 2rem; }
 
+.hosted-note {
+  max-width: 1180px;
+  margin: 1.25rem auto -0.75rem;
+  padding: 0.65rem 1rem;
+  background: var(--warn-soft);
+  border-left: 3px solid var(--warn);
+  color: var(--warn);
+  font-size: 0.84rem;
+}
+
 footer.site {
   max-width: 1180px;
   margin: 0 auto;

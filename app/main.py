@@ -34,6 +34,7 @@ templates.env.globals.update(
     display=bills.display,
     status_label=status.label,
     today=config.TODAY,
+    hosted=config.HOSTED,
 )
 
 STAGES = ["Upload", "Read", "Check", "Ask", "Enrich", "Draft", "Approve", "Send"]
