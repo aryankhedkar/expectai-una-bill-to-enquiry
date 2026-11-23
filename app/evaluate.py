@@ -19,7 +19,7 @@ def sample_names() -> list[str]:
 
 
 def compare(name: str) -> dict:
-    """What the reader said against what the bill actually says."""
+    """What the reader said against what the bill says."""
     expected = load("expected", name)
     got = {k: v["value"] for k, v in load("extractions", name)["fields"].items()}
     return {field: (got.get(field) == value, got.get(field), value) for field, value in expected.items()}

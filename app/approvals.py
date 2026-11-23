@@ -1,7 +1,7 @@
 """
 Approving an enquiry, editing it afterwards, and sending it once.
 An approval is tied to a hash of what will be sent, so it can only ever authorise
-the version the owner actually saw.
+the version the owner saw.
 Leaves out: real delivery. Sending writes rows to a table.
 """
 

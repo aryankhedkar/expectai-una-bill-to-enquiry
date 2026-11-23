@@ -15,4 +15,4 @@
 
 ## What a production version adds
 
-A queue with retries on a growing delay, and a dead letter list someone reviews every day. Alerts on the rate of failed reads rather than on single failures. An evaluation set of 100 to 200 real bills from the most common suppliers, with the right answers written down, run on every change to the prompt or the model, reporting accuracy for each field rather than one overall number. Supplier layouts differ, and the unusual ones fail first.
+A queue with retries on a growing delay, and a dead letter list someone reviews every day. Alerts on the rate of failed reads, not on single failures. An evaluation set of 100 to 200 real bills from the most common suppliers, with the right answers written down, run on every change to the prompt or the model, reporting accuracy for each field instead of one overall number. Supplier layouts differ, and the unusual ones fail first.

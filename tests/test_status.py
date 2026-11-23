@@ -1,4 +1,4 @@
-"""The status table is enforced, and every move leaves exactly one event."""
+"""The status table is enforced, and every move leaves one event."""
 
 import pytest
 
