@@ -6,6 +6,7 @@ Leaves out: sign-in. One demo owner approves everything.
 """
 
 import json
+import logging
 import sqlite3
 
 from contextlib import asynccontextmanager
@@ -27,6 +28,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Bill to Enquiry", lifespan=lifespan)
+logger = logging.getLogger("bill_to_enquiry")
 
 
 @app.middleware("http")
@@ -35,20 +37,24 @@ async def keep_the_visitors_place(request: Request, call_next):
     On a hosted copy, point this request at the visitor's own database and bring it up
     to date from their journal first. A local run skips all of this.
     """
-    if not config.HOSTED or request.url.path.startswith("/static"):
+    path = request.url.path
+    if not config.HOSTED or path.startswith("/static") or path == "/favicon.ico":
         return await call_next(request)
 
     visitor = journal.from_cookies(request.cookies)
-    async with journal.lock_for(visitor):
+    async with journal.LOCK:
         await run_in_threadpool(journal.prepare, visitor)
         visitor_token = journal.CURRENT.set(visitor)
         db_token = db.VISITOR_DB.set(visitor.db_path)
         try:
             response = await call_next(request)
+        except Exception:
+            visitor.stale = True
+            raise
         finally:
             db.VISITOR_DB.reset(db_token)
             journal.CURRENT.reset(visitor_token)
-        await run_in_threadpool(journal.settle, visitor)
+            await run_in_threadpool(journal.settle, visitor)
     journal.write_cookies(visitor, response)
     return response
 app.mount("/static", StaticFiles(directory=config.ROOT / "app" / "static"), name="static")
@@ -93,6 +99,8 @@ DONE_THROUGH = {
     status.FAILED: 0,
 }
 STOPPED = {status.REJECTED, status.FAILED}
+# A stopped bill shows the reasoning for the stage where it stopped.
+STOPPED_AT = {status.FAILED: "Read", status.REJECTED: "Approve"}
 
 SAMPLES = [
     {
@@ -152,11 +160,33 @@ def home(request: Request, msg: str = ""):
 
 
 def act(entry: list, data: bytes | None = None) -> RedirectResponse:
-    """Apply one change, add it to the visitor's journal, and show the bill it touched."""
+    """
+    Apply one change, add it to the visitor's journal, and show the bill it touched.
+    A change that would not fit in the journal is refused before it is made, and one
+    that fails part way is undone on a hosted copy by rebuilding from the journal.
+    """
+    moment = journal.stamp()
+    line = [moment, *entry]
+    if not journal.fits(line):
+        return RedirectResponse(f"/?msg={journal.FULL}", status_code=303)
+
     conn = get_conn()
-    bill_id, message = journal.apply(conn, entry, data)
-    conn.close()
-    journal.record(entry)
+    token = db.CLOCK.set(journal.iso(moment))
+    try:
+        bill_id, message = journal.apply(conn, entry, data)
+    except Exception:
+        logger.exception("Could not apply %s", entry[0])
+        conn.rollback()
+        journal.mark_stale()
+        bill_id, message = (entry[1] if isinstance(entry[1], int) else None), (
+            "That change could not be made, so nothing was changed."
+        )
+    else:
+        journal.record(line)
+    finally:
+        db.CLOCK.reset(token)
+        conn.close()
+
     if bill_id is None:
         return RedirectResponse(f"/?msg={message}", status_code=303)
     return go(bill_id, message)
@@ -184,6 +214,10 @@ async def upload(file: UploadFile):
             sample_name = sample["name"]
     filename = file.filename or "upload.html"
     entry = journal.upload_entry(filename, sample_name, data)
+    # On a hosted copy a large non-sample file is kept by hash, and the placeholder that
+    # stands in for it on replay is used now as well, so the bill is the same everywhere.
+    if config.HOSTED and journal.kept_by_hash(entry):
+        data = None
     return await run_in_threadpool(act, entry, data)
 
 
@@ -199,7 +233,7 @@ def document_html(bill) -> str | None:
     Only the bundled samples are rendered as HTML. An uploaded file is somebody
     else's markup and is not put on the page.
     """
-    if not bill["sample_name"]:
+    if bill["sample_name"] not in SAMPLE_BY_NAME:
         return None
     path = config.SAMPLES_DIR / f"{bill['sample_name']}.html"
     return path.read_text() if path.exists() else None
@@ -260,7 +294,7 @@ def bill_page(request: Request, bill_id: int, msg: str = ""):
         "outbox": approvals.outbox_for(conn, bill_id),
         "replies": approvals.replies_for(conn, bill_id),
         "events": status.events(conn, bill_id),
-        "decisions": designdocs.decisions_for(current_stage),
+        "decisions": designdocs.decisions_for(STOPPED_AT.get(bill["status"], current_stage)),
         "date_fields": checks.DATE_FIELDS,
         "waiting": stages.WAITING.get(bill["status"], ""),
         "runnable": bill["status"] in stages.NEXT,

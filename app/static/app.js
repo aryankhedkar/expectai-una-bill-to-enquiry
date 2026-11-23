@@ -1,9 +1,9 @@
-// A few small things and nothing else: highlight the line a value came from, keep the
-// approve button disabled until the authority box is ticked, make the upload box respond
-// to a chosen or dropped file, and mark the section of the design page in view.
+// A few small things: mark the line a value came from, keep the approve button disabled
+// until the authority box is ticked, make the upload box answer a chosen or dropped file,
+// offer a date picker when a date field is being edited, and follow the design contents.
 
 (function () {
-  // --- Highlight the source line on the bill -----------------------------------
+  // --- Mark the source line on the bill -----------------------------------------
   document.addEventListener('click', function (event) {
     var trigger = event.target.closest('[data-line-ref]');
     if (!trigger) return;
@@ -13,25 +13,22 @@
     document.querySelectorAll('.document [data-line].highlight').forEach(function (node) {
       node.classList.remove('highlight');
     });
-    document.querySelectorAll('[data-line-ref].is-active').forEach(function (node) {
+    document.querySelectorAll('.read-value.is-active').forEach(function (node) {
       node.classList.remove('is-active');
     });
 
     var target = document.querySelector('.document [data-line="' + lineId + '"]');
     if (!target) return;
-    // Restart the glow even when the same line is clicked twice.
-    void target.offsetWidth;
     target.classList.add('highlight');
     if (trigger.classList.contains('read-value')) trigger.classList.add('is-active');
 
-    var pane = target.closest('.paper');
-    var paneScrolls = pane && pane.scrollHeight > pane.clientHeight + 1;
-    if (paneScrolls) {
-      var top = target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop;
-      pane.scrollTo({ top: top - pane.clientHeight / 2, behavior: 'smooth' });
+    var sheet = target.closest('.sheet');
+    if (sheet && sheet.scrollHeight > sheet.clientHeight + 1) {
+      var top = target.getBoundingClientRect().top - sheet.getBoundingClientRect().top + sheet.scrollTop;
+      sheet.scrollTo({ top: top - sheet.clientHeight / 2, behavior: 'smooth' });
     }
     var box = target.getBoundingClientRect();
-    if (box.top < 70 || box.bottom > window.innerHeight) {
+    if (box.top < 0 || box.bottom > window.innerHeight) {
       target.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   });
@@ -67,22 +64,34 @@
     show();
   }
 
+  // --- Edit form: a date picker for date fields ---------------------------------
+  var edit = document.getElementById('edit-form');
+  if (edit) {
+    var select = edit.querySelector('select');
+    var value = edit.querySelector('input[name="value"]');
+    var fit = function () {
+      var option = select.options[select.selectedIndex];
+      value.type = option && option.getAttribute('data-kind') === 'date' ? 'date' : 'text';
+    };
+    select.addEventListener('change', fit);
+    fit();
+  }
+
   // --- Design page contents ----------------------------------------------------
-  var links = document.querySelectorAll('.contents a[data-spy]');
+  var links = document.querySelectorAll('.toc a[data-spy]');
   if (links.length && 'IntersectionObserver' in window) {
     var byId = {};
     links.forEach(function (link) { byId[link.getAttribute('data-spy')] = link; });
     var visible = {};
+    var chapters = document.querySelectorAll('.chapter');
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) { visible[entry.target.id] = entry.isIntersecting; });
       var first = null;
-      document.querySelectorAll('.blocks .block').forEach(function (block) {
-        if (!first && visible[block.id]) first = block.id;
-      });
+      chapters.forEach(function (chapter) { if (!first && visible[chapter.id]) first = chapter.id; });
       if (!first) return;
       links.forEach(function (link) { link.classList.remove('is-active'); });
       if (byId[first]) byId[first].classList.add('is-active');
-    }, { rootMargin: '-80px 0px -55% 0px' });
-    document.querySelectorAll('.blocks .block').forEach(function (block) { observer.observe(block); });
+    }, { rootMargin: '-10% 0px -60% 0px' });
+    chapters.forEach(function (chapter) { observer.observe(chapter); });
   }
 })();

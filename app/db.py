@@ -15,6 +15,10 @@ from app import config
 # which one here. On a local run it stays empty and config.DB_PATH is used.
 VISITOR_DB: ContextVar[Path | None] = ContextVar("visitor_db", default=None)
 
+# When a change is replayed, this holds the time it was first made, so the record
+# reads the same however many times it is rebuilt. Otherwise the real clock is used.
+CLOCK: ContextVar[str | None] = ContextVar("clock", default=None)
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS bills (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,7 +133,7 @@ CREATE TABLE IF NOT EXISTS events (
 
 def now() -> str:
     """One timestamp format everywhere, so sorting by text sorts by time."""
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return CLOCK.get() or datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def connect(path=None) -> sqlite3.Connection:

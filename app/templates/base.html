@@ -3,51 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f7">
-  <title>{% block title %}Bill to Enquiry{% endblock %} &middot; ExpectAI sketch</title>
+  <meta name="theme-color" content="#f7f4ee">
+  <title>{% block title %}Bill to Enquiry{% endblock %} &middot; a sketch for ExpectAI</title>
   <meta name="description" content="A design sketch of one journey: from a small business's electricity bill to a quote request the owner has approved.">
   <link rel="icon" type="image/svg+xml" href="/static/brand/expectai-ring.svg">
   <link rel="icon" type="image/png" sizes="48x48" href="/static/brand/favicon.png">
   <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
-  <link rel="stylesheet" href="/static/style.css?v=2">
+  <link rel="preload" href="/static/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/style.css?v=3">
 </head>
 {% set path = request.url.path %}
-<body class="{% block body_class %}{% endblock %}">
-  <header class="nav">
-    <div class="nav-inner">
-      <a class="brand" href="/" aria-label="Bill to Enquiry, home">
-        <img class="brand-mark" src="/static/brand/expectai-wordmark.svg" alt="ExpectAI" width="74" height="18">
-        <span class="brand-sep" aria-hidden="true"></span>
+<body>
+  <header class="masthead">
+    <div class="wrap masthead-row">
+      <a class="brand" href="/" aria-label="Bill to Enquiry, a sketch for ExpectAI">
+        <img class="brand-mark" src="/static/brand/expectai-wordmark.svg" alt="ExpectAI" width="66" height="16">
+        <span class="brand-rule" aria-hidden="true"></span>
         <span class="brand-name">Bill to Enquiry</span>
       </a>
-      <nav class="nav-links">
-        <a href="/" class="{{ 'active' if path == '/' or path.startswith('/bills') }}">Bills</a>
-        <a href="/design" class="{{ 'active' if path.startswith('/design') }}">Design</a>
-        <a href="/outbox" class="{{ 'active' if path.startswith('/outbox') }}">Outbox</a>
+      <nav class="nav" aria-label="Main">
+        <a href="/" {% if path == '/' or path.startswith('/bills') %}aria-current="page"{% endif %}>Bills</a>
+        <a href="/design" {% if path.startswith('/design') %}aria-current="page"{% endif %}>Design</a>
+        <a href="/outbox" {% if path.startswith('/outbox') %}aria-current="page"{% endif %}>Outbox</a>
       </nav>
     </div>
+    {% if hosted %}
+    <div class="hosted">
+      <form class="wrap hosted-row" method="post" action="/start-over">
+        <span class="meta">Hosted demo</span>
+        <p>Each visitor has their own copy, kept in a cookie for a week.</p>
+        <button type="submit" class="link link-pen">Start over</button>
+      </form>
+    </div>
+    {% endif %}
   </header>
 
-  {% if hosted %}
-  <form class="hosted-note" method="post" action="/start-over">
-    <span class="hosted-dot" aria-hidden="true"></span>
-    Hosted demo. Each visitor gets their own copy, kept in a cookie for a week.
-    <button type="submit" class="hosted-reset">Start over</button>
-  </form>
-  {% endif %}
+  <main>{% block content %}{% endblock %}</main>
 
-  <main class="{% block main_class %}page{% endblock %}">{% block content %}{% endblock %}</main>
-
-  <footer class="footer">
-    <div class="footer-inner">
-      <img src="/static/brand/expectai-ring.svg" alt="" width="18" height="18">
+  <footer class="wrap colophon">
+    <div class="colophon-row">
+      <span class="meta">Colophon</span>
       <p>
-        A design sketch prepared for a conversation with ExpectAI. Not an ExpectAI product.
-        Synthetic data throughout. The demo treats {{ today.strftime('%d %B %Y').lstrip('0') }} as today.
+        A design sketch prepared for a conversation with ExpectAI. It is not an ExpectAI product.
+        Every business, supplier and meter number is invented, and the demo treats
+        {{ today.strftime('%d %B %Y').lstrip('0') }} as today.
       </p>
+      <span class="meta">Newsreader, Geist, Geist Mono</span>
     </div>
   </footer>
 
-  <script src="/static/app.js?v=2"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>

@@ -244,3 +244,11 @@ def test_a_simulated_reply_closes_the_loop(client):
     approve_and_send(client, bill_id)
     client.post(f"/bills/{bill_id}/reply")
     assert status_of(bill_id) == status.REPLIED
+
+
+def test_a_typed_number_that_is_not_a_number_is_refused(client):
+    bill_id = open_sample(client, "clean")
+    client.post(f"/bills/{bill_id}/run")
+    page = client.post(f"/bills/{bill_id}/edit", data={"field": "kwh", "value": "12000 kWh"}).text
+    assert "needs to be a number" in page
+    assert status_of(bill_id) == status.AWAITING_APPROVAL

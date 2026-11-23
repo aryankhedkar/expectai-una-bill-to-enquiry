@@ -20,6 +20,10 @@
 | `app/templates/` | `base`, `home`, `bill`, `design` and `outbox` |
 | `app/static/` | One stylesheet and a small script: line highlighting, the authority tick, the upload box and the contents on the design page |
 | `app/static/brand/` | The ExpectAI wordmark and ring, used in the header and as the favicon |
+| `app/static/fonts/` | Newsreader, Geist and Geist Mono, bundled so the app makes no font requests |
+| `app/journal.py` | Every change as one entry; on a hosted copy the entries ride in a cookie and are replayed on a fresh instance |
+| `DESIGN.md` | The visual system: colour, type, layout and what is banned |
+| `tests/test_hosted.py` | The hosted copy, with every request landing on an instance that has never seen the visitor |
 | `samples/` | Four bills in two layouts, with a `data-line` id on every value |
 | `fixtures/extractions/` | The recorded reader output for each sample |
 | `fixtures/expected/` | What each bill says, for the evaluation |

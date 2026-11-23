@@ -42,11 +42,14 @@ Python 3.11 or newer. Nothing leaves your machine: there are no network calls in
 
 - `docs/` the design, in the order it was worked out. `docs/09-file-map.md` lists every file.
 - `BUILD_BRIEF.md` the brief this build followed, written before any code.
-- `app/` the application. `checks.py` and `status.py` are the two files worth reading first.
+- `app/` the application. `checks.py` and `status.py` are the two files worth reading first, then `journal.py` for the hosted copy.
+- `DESIGN.md` the visual system.
 - `samples/` the four sample bills. `fixtures/` the recorded reader output and the known right answers.
 
 ## How this was built
 
 I worked the design out with Claude and built it with Cursor on 23 November 2026. The data is synthetic. The reader replays recorded model output unless a model key is set.
 
-The interface follows a plain, system-font style: white cards on a soft grey page, one accent colour taken from the ExpectAI wordmark, and no CSS framework or build step.
+The look is described in `DESIGN.md`: warm paper, blue-black ink, and ExpectAI's blue used as a reviewer's pen for whatever needs the owner. Newsreader, Geist and Geist Mono are bundled, so there is no font request, no CSS framework and no build step.
+
+The hosted copy runs on serverless instances that each have their own disk. Every change is one journal entry, the entries travel in the visitor's cookie, and an instance that has not seen the visitor replays them. That works because the app is deterministic: recorded reader output, a fixed today, and each entry carrying the time it was first made. A local run uses one database and no cookie.

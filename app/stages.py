@@ -197,6 +197,9 @@ def answer(conn: sqlite3.Connection, bill, question_id: int, action: str, value:
     elif action == "correct":
         if not value.strip():
             return "Type the value from the bill, or choose one of the other answers."
+        problem = checks.problem_with(field, value.strip())
+        if problem:
+            return problem
         bills.set_value(conn, bill["id"], field, value.strip(), "customer")
         conn.execute(
             "UPDATE checks SET accepted = 1 WHERE bill_id = ? AND name = ?",

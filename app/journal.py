@@ -12,23 +12,46 @@ import hashlib
 import json
 import re
 import secrets
+import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app import approvals, bills, config, db, seed, stages
 
 DUPLICATE = "We already have this bill, so no second copy was made."
+FULL = "This demo copy is full. Press Start over at the top of the page to begin again."
 
 VISITOR_COOKIE = "b2e_visitor"
 JOURNAL_COOKIE = "b2e_journal"
 COOKIE_DAYS = 7
-# Browsers keep about 4 KB per cookie. Past this the journal stops growing and a fresh
-# instance shows the visitor's state as it was when the limit was reached.
+# Browsers keep about 4 KB per cookie, so the journal stops short of that. A change that
+# would not fit is refused before it is made, never made and then forgotten.
 MAX_JOURNAL_BYTES = 3800
-# A non-sample upload this small travels in the cookie. A bigger one is replayed as a
-# stand-in, which is enough because demo mode never reads it.
-SMALL_UPLOAD_BYTES = 600
+MAX_LINES = 120
+# A non-sample upload this small travels in the cookie. A bigger one is kept by its hash
+# and stood in for by a short placeholder, both when it arrives and when it is replayed,
+# so its identity is the same everywhere. Demo mode never reads it either way.
+SMALL_UPLOAD_BYTES = 300
+# Each instance keeps at most this many visitor databases; the oldest go first and are
+# rebuilt from their cookie if that visitor comes back.
+MAX_VISITOR_FILES = 400
+
+# What each kind of entry carries, checked before anything from a cookie is replayed.
+OPTIONAL_TEXT = (str, type(None))
+SHAPES = {
+    "sample": (str,),
+    "upload": (str, OPTIONAL_TEXT, OPTIONAL_TEXT),
+    "next": (int,),
+    "run": (int,),
+    "answer": (int, int, str, str),
+    "approve": (int, str, str),
+    "edit": (int, str, str),
+    "reject": (int, str),
+    "send": (int,),
+    "reply": (int,),
+}
 
 
 # --- Applying one entry -----------------------------------------------------------
@@ -40,6 +63,8 @@ def apply(conn, entry: list, data: bytes | None = None) -> tuple[int | None, str
     The routes call this for every change, and a replay calls it for every entry, so
     there is one code path whether the change is new or being repeated.
     """
+    if not well_formed(entry):
+        raise ValueError(f"Not a journal entry: {entry!r}")
     kind, *args = entry
 
     if kind == "sample":
@@ -79,9 +104,24 @@ def apply(conn, entry: list, data: bytes | None = None) -> tuple[int | None, str
         return bill_id, approvals.reject(conn, bill, reason)
     if kind == "send":
         return bill_id, approvals.send(conn, bill)
-    if kind == "reply":
-        return bill_id, approvals.simulate_reply(conn, bill)
-    raise ValueError(f"Unknown entry {kind!r}")
+    return bill_id, approvals.simulate_reply(conn, bill)
+
+
+def well_formed(entry) -> bool:
+    """The right kind, the right number of values, the right types, and a real sample."""
+    if not isinstance(entry, list) or not entry or entry[0] not in SHAPES:
+        return False
+    kind, *args = entry
+    shape = SHAPES[kind]
+    if len(args) != len(shape) or not all(isinstance(a, t) for a, t in zip(args, shape)):
+        return False
+    if any(isinstance(a, str) and len(a) > 2000 for a in args):
+        return False
+    if kind == "sample" and args[0] not in seed.SAMPLE_NAMES:
+        return False
+    if kind == "upload" and args[1] is not None and args[1] not in seed.SAMPLE_NAMES:
+        return False
+    return True
 
 
 def upload_entry(filename: str, sample_name: str | None, data: bytes) -> list:
@@ -93,7 +133,11 @@ def upload_entry(filename: str, sample_name: str | None, data: bytes) -> list:
             if len(data) <= SMALL_UPLOAD_BYTES
             else "sha256:" + bills.sha256_of(data)
         )
-    return ["upload", filename, sample_name, inline]
+    return ["upload", filename[:200], sample_name, inline]
+
+
+def kept_by_hash(entry: list) -> bool:
+    return entry[0] == "upload" and isinstance(entry[3], str) and entry[3].startswith("sha256:")
 
 
 def _upload_bytes(sample_name: str | None, inline: str | None) -> bytes:
@@ -110,11 +154,12 @@ def _upload_bytes(sample_name: str | None, inline: str | None) -> bytes:
 @dataclass
 class Visitor:
     vid: str
-    entries: list = field(default_factory=list)
+    # Each line is [unix time, kind, ...values]: an entry and when it was first made.
+    lines: list = field(default_factory=list)
     is_new: bool = False
     changed: bool = False
-    # Set when this instance's database no longer matches the journal, so the next
-    # request rebuilds it instead of trusting it.
+    # Set when this instance's database may not match the journal, so the next request
+    # rebuilds it instead of trusting it.
     stale: bool = False
 
     @property
@@ -126,69 +171,107 @@ class Visitor:
         """Holds the fingerprint of the journal this instance's database reflects."""
         return self.db_path.with_suffix(".applied")
 
+    @property
+    def arrived(self) -> int:
+        """The visitor id starts with the time they first arrived, in hex."""
+        return int(self.vid[:8], 16)
+
 
 CURRENT: ContextVar[Visitor | None] = ContextVar("visitor", default=None)
-_locks: dict[str, asyncio.Lock] = {}
+# One request at a time per instance. A demo has little traffic, and this keeps a replay
+# from ever interleaving with another request's writes.
+LOCK = asyncio.Lock()
 
 
-def record(entry: list) -> None:
-    """Add an entry to the current visitor's journal. Does nothing on a local run."""
+def stamp() -> int:
+    return int(time.time())
+
+
+def iso(moment: int) -> str:
+    return datetime.fromtimestamp(moment, timezone.utc).isoformat(timespec="seconds")
+
+
+def fits(line: list) -> bool:
+    """Whether one more line still fits in the visitor's cookie. Always true locally."""
+    visitor = CURRENT.get()
+    if visitor is None:
+        return True
+    candidate = visitor.lines + [line]
+    return len(candidate) <= MAX_LINES and len(encode(candidate)) <= MAX_JOURNAL_BYTES
+
+
+def record(line: list) -> None:
+    """Add a line to the current visitor's journal. Does nothing on a local run."""
     visitor = CURRENT.get()
     if visitor is None:
         return
-    candidate = visitor.entries + [entry]
-    if len(encode(candidate)) > MAX_JOURNAL_BYTES:
+    if not fits(line):
         visitor.stale = True
         return
-    visitor.entries = candidate
+    visitor.lines = visitor.lines + [line]
     visitor.changed = True
+
+
+def mark_stale() -> None:
+    visitor = CURRENT.get()
+    if visitor is not None:
+        visitor.stale = True
 
 
 def start_over() -> bool:
     visitor = CURRENT.get()
     if visitor is None:
         return False
-    visitor.entries = []
+    visitor.lines = []
     visitor.changed = True
     visitor.stale = True
     return True
 
 
+def new_vid() -> str:
+    return f"{stamp():08x}{secrets.token_hex(6)}"
+
+
 def from_cookies(cookies: dict) -> Visitor:
+    lines = decode(cookies.get(JOURNAL_COOKIE, ""))
     vid = cookies.get(VISITOR_COOKIE, "")
-    if not re.fullmatch(r"[0-9a-f]{20}", vid):
-        return Visitor(vid=secrets.token_hex(10), is_new=True)
-    return Visitor(vid=vid, entries=decode(cookies.get(JOURNAL_COOKIE, "")))
+    if re.fullmatch(r"[0-9a-f]{20}", vid):
+        arrived = int(vid[:8], 16)
+        if 1_767_225_600 <= arrived <= stamp() + 86_400:  # from 1 January 2026 to tomorrow
+            return Visitor(vid=vid, lines=lines)
+    # No usable id. Keep any journal the browser still holds, under a fresh id.
+    return Visitor(vid=new_vid(), lines=lines, is_new=True)
 
 
-def encode(entries: list) -> str:
-    raw = json.dumps(entries, separators=(",", ":")).encode()
+def encode(lines: list) -> str:
+    raw = json.dumps(lines, separators=(",", ":")).encode()
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
 def decode(text: str) -> list:
-    """A journal that does not parse is treated as empty rather than trusted."""
-    if not text:
+    """A journal that is too big, does not parse, or holds a bad line counts as empty."""
+    if not text or len(text) > MAX_JOURNAL_BYTES + 100:
         return []
     try:
         raw = base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
-        entries = json.loads(raw)
+        lines = json.loads(raw)
     except (binascii.Error, ValueError):
         return []
-    if not isinstance(entries, list) or not all(
-        isinstance(e, list) and e and isinstance(e[0], str) for e in entries
-    ):
+    if not isinstance(lines, list) or len(lines) > MAX_LINES:
         return []
-    return entries
+    for line in lines:
+        if not (
+            isinstance(line, list)
+            and len(line) >= 2
+            and isinstance(line[0], int)
+            and well_formed(line[1:])
+        ):
+            return []
+    return lines
 
 
-def fingerprint(entries: list) -> str:
-    return hashlib.sha256(encode(entries).encode()).hexdigest()
-
-
-def lock_for(visitor: Visitor) -> asyncio.Lock:
-    """One request at a time per visitor on an instance, so a replay is never interleaved."""
-    return _locks.setdefault(visitor.vid, asyncio.Lock())
+def fingerprint(visitor: Visitor) -> str:
+    return hashlib.sha256(f"{visitor.vid}:{encode(visitor.lines)}".encode()).hexdigest()
 
 
 # --- Bringing an instance's copy up to date ------------------------------------------
@@ -198,27 +281,36 @@ def prepare(visitor: Visitor) -> None:
     """
     Make sure this instance holds the visitor's database as their journal describes it.
     If it already does, nothing happens. If not, the database is rebuilt from the four
-    samples and every entry is applied again in order. The reader replays recorded
-    output and the demo's today is fixed, so the result is the same each time.
+    samples and every line is applied again in order, at the time it was first made.
+    The reader replays recorded output and the demo's today is fixed, so the result
+    is the same each time.
     """
-    wanted = fingerprint(visitor.entries)
+    wanted = fingerprint(visitor)
     if visitor.db_path.exists() and _applied(visitor) == wanted:
+        visitor.db_path.touch()
         return
 
-    visitor.db_path.parent.mkdir(parents=True, exist_ok=True)
+    folder = visitor.db_path.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    _prune(folder)
     for path in (visitor.db_path, visitor.marker):
         path.unlink(missing_ok=True)
 
     conn = db.connect(visitor.db_path)
     db.setup(conn)
-    if config.DEMO_SEED:
-        seed.open_samples(conn)
-    for entry in visitor.entries:
-        try:
-            apply(conn, entry)
-        except Exception:  # noqa: BLE001 - one bad entry should not lose the rest
-            continue
-    conn.close()
+    token = db.CLOCK.set(iso(visitor.arrived))
+    try:
+        if config.DEMO_SEED:
+            seed.open_samples(conn)
+        for moment, *entry in visitor.lines:
+            db.CLOCK.set(iso(moment))
+            try:
+                apply(conn, entry)
+            except Exception:  # noqa: BLE001 - one bad line should not lose the rest
+                conn.rollback()
+    finally:
+        db.CLOCK.reset(token)
+        conn.close()
     visitor.marker.write_text(wanted)
 
 
@@ -226,8 +318,9 @@ def settle(visitor: Visitor) -> None:
     """After a request, note which journal this instance's database now reflects."""
     if visitor.stale:
         visitor.marker.unlink(missing_ok=True)
+        visitor.db_path.unlink(missing_ok=True)
     elif visitor.changed:
-        visitor.marker.write_text(fingerprint(visitor.entries))
+        visitor.marker.write_text(fingerprint(visitor))
 
 
 def _applied(visitor: Visitor) -> str:
@@ -237,10 +330,18 @@ def _applied(visitor: Visitor) -> str:
         return ""
 
 
+def _prune(folder: Path) -> None:
+    databases = sorted(folder.glob("*.db"), key=lambda p: p.stat().st_mtime)
+    for old in databases[: max(0, len(databases) - MAX_VISITOR_FILES + 1)]:
+        old.unlink(missing_ok=True)
+        old.with_suffix(".applied").unlink(missing_ok=True)
+
+
 def write_cookies(visitor: Visitor, response) -> None:
+    """Both cookies are written together, so the id never expires before its journal."""
+    if not (visitor.is_new or visitor.changed):
+        return
     age = COOKIE_DAYS * 24 * 3600
     options = {"max_age": age, "path": "/", "httponly": True, "secure": True, "samesite": "lax"}
-    if visitor.is_new:
-        response.set_cookie(VISITOR_COOKIE, visitor.vid, **options)
-    if visitor.changed:
-        response.set_cookie(JOURNAL_COOKIE, encode(visitor.entries), **options)
+    response.set_cookie(VISITOR_COOKIE, visitor.vid, **options)
+    response.set_cookie(JOURNAL_COOKIE, encode(visitor.lines), **options)

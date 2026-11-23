@@ -5,6 +5,7 @@ can be read on its own and argued with.
 Leaves out: rules that need outside data, such as whether a rate is competitive.
 """
 
+import math
 from dataclasses import dataclass
 from datetime import date
 
@@ -59,6 +60,7 @@ MONEY_FIELDS = {
     "total",
 }
 DATE_FIELDS = {"period_start", "period_end", "contract_end_date"}
+NUMBER_FIELDS = MONEY_FIELDS | {"kwh", "unit_rate_p", "standing_charge_p"}
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,17 @@ def number(text) -> float | None:
         return float(cleaned)
     except ValueError:
         return None
+
+
+def problem_with(field: str, value: str) -> str | None:
+    """Why a value the owner typed cannot be used, or None if it can."""
+    if field in NUMBER_FIELDS:
+        figure = number(value)
+        if figure is None or not math.isfinite(figure) or figure < 0:
+            return f"{label(field)} needs to be a number, such as 412.80."
+    if field in DATE_FIELDS and parse_date(value) is None:
+        return f"{label(field)} needs to be a date, written as 2027-03-31."
+    return None
 
 
 def parse_date(text) -> date | None:

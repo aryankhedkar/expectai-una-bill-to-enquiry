@@ -1,67 +1,71 @@
 {% extends "base.html" %}
 {% block title %}{{ sample.title if sample else bill.filename }}{% endblock %}
-{% block main_class %}page page-wide{% endblock %}
 
-{% macro icon_check() %}<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 8.5 3 3 6-7"/></svg>{% endmacro %}
-{% macro icon_cross() %}<svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m4 4 8 8M12 4l-8 8"/></svg>{% endmacro %}
-{% macro icon_dash() %}<svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h8"/></svg>{% endmacro %}
+{% macro check_row(check) %}
+  {% set state = 'pass' if check.passed else ('settled' if check.accepted else 'fail') %}
+  <li class="check-{{ state }}">
+    <span class="check-mark">{{ {'pass': 'Pass', 'settled': 'Settled', 'fail': 'Fail'}[state] }}</span>
+    <span>
+      <span class="check-title">{{ check.title }}</span>
+      <span class="check-msg">{{ check.message }}</span>
+    </span>
+  </li>
+{% endmacro %}
 
 {% block content %}
-<a class="back" href="/">All bills</a>
+<div class="wrap">
+  <nav class="crumbs meta" aria-label="Breadcrumb">
+    <a href="/">Bills</a><span aria-hidden="true">/</span><span>{{ bill.filename }}</span>
+  </nav>
 
-<header class="bill-head">
-  <div>
-    {% if sample %}<p class="eyebrow">{{ sample.tag }}</p>{% endif %}
+  <header class="bill-head">
+    {% if sample %}<p class="meta">{{ sample.tag }}</p>{% endif %}
     <h1>{{ sample.title if sample else bill.filename }}</h1>
-    <p class="bill-meta">
+    <p class="bill-facts">
+      <span class="status status-{{ bill.status }}">{{ status_label(bill.status) }}</span>
       <span class="mono">{{ bill.filename }}</span>
-      <span class="pill pill-{{ bill.status }}">{{ status_label(bill.status) }}</span>
+      <span>Opened {{ when(bill.created_at) }}</span>
     </p>
-  </div>
-</header>
+  </header>
 
-<ol class="tracker" aria-label="Progress through the eight stages">
-  {% for stage in stages %}
-  <li class="{{ stage.state }}" {% if stage.state == 'current' %}aria-current="step"{% endif %}>
-    <span class="tracker-dot">{% if stage.state == 'done' %}{{ icon_check() }}{% else %}{{ loop.index }}{% endif %}</span>
-    <span class="tracker-name">{{ stage.name }}</span>
-  </li>
-  {% endfor %}
-</ol>
+  <ol class="stages" aria-label="The eight stages">
+    {% for stage in stages %}
+    <li class="{{ stage.state }}" {% if stage.state == 'current' %}aria-current="step"{% endif %} title="{{ stage.name }}">
+      <span class="num">{{ '%02d'|format(loop.index) }}</span>
+      <span class="name">{{ stage.name }}</span>
+    </li>
+    {% endfor %}
+  </ol>
 
-{% if message %}<p class="flash"><span class="flash-dot" aria-hidden="true"></span>{{ message }}</p>{% endif %}
+  {% if message %}<p class="notice">{{ message }}</p>{% endif %}
 
-<div class="columns">
-  <section class="doc-col" aria-label="The bill">
-    <div class="doc-sticky">
-      <p class="col-label">The bill</p>
-      {% if document_html %}
-        <div class="paper document">{{ document_html|safe }}</div>
-        <p class="hint">Click any value on the right to highlight the line it was read from.</p>
-      {% else %}
-        <div class="paper paper-empty">
-          <p>
-            This file was uploaded rather than chosen from the samples. Uploaded documents are not
-            rendered on the page, because that markup is somebody else's.
-          </p>
-        </div>
-      {% endif %}
-    </div>
-  </section>
+  <div class="workbench">
+    <section class="sheet-col" aria-label="The bill">
+      <div class="sheet-sticky">
+        {% if document_html %}
+          <div class="sheet document">{{ document_html|safe }}</div>
+          <p class="hint">Click a value under What we read to mark the line it came from.</p>
+        {% else %}
+          <div class="sheet sheet-empty">
+            <p>
+              This file was uploaded rather than chosen from the samples. Uploaded documents are
+              not rendered on the page, because that markup is somebody else's.
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    </section>
 
-  <section class="panel-col">
-
-    {# ---------- the panel for the stage the bill is on ---------- #}
-    <div class="card stage-card">
-      <header class="card-head">
+    <section class="reading">
+      <header class="stage-head">
         {% if current_number %}
-          <p class="eyebrow">Stage {{ current_number }} of 8</p>
+          <p class="meta">Stage {{ '%02d'|format(current_number) }} of 08</p>
           <h2>{{ current_stage }}</h2>
         {% elif bill.status in ('sent', 'replied') %}
-          <p class="eyebrow">All eight stages done</p>
-          <h2>{{ 'Reply received' if bill.status == 'replied' else 'Sent' }}</h2>
+          <p class="meta">All eight stages done</p>
+          <h2>{{ 'A supplier replied' if bill.status == 'replied' else 'Sent' }}</h2>
         {% else %}
-          <p class="eyebrow">Stopped</p>
+          <p class="meta">Stopped</p>
           <h2>{{ status_label(bill.status) }}</h2>
         {% endif %}
       </header>
@@ -71,37 +75,39 @@
 
       {% elif bill.status == 'read' %}
         <p>
-          The reader returned {{ fields|length }} fields with a confidence and a source line for
-          each. None of it has been tested yet.
+          The reader returned {{ fields|length }} fields, each with a confidence and the line it
+          came from. None of it has been tested yet.
         </p>
 
       {% elif bill.status == 'needs_answer' %}
-        <p class="muted">
+        <p>
           {{ open_questions|length }} question{{ '' if open_questions|length == 1 else 's' }} for
-          the owner. The system does not fill in a failed or uncertain value by itself.
+          the owner. The system never fills in a failed or uncertain value by itself.
         </p>
         {% for question in open_questions %}
-        <form class="question" method="post" action="/bills/{{ bill.id }}/questions/{{ question.id }}">
-          <p class="question-badge">
-            {% if question.status == 'unsure' %}Flagged for a person{% else %}Needs your answer{% endif %}
+        <form class="query" method="post" action="/bills/{{ bill.id }}/questions/{{ question.id }}">
+          <p class="query-meta">
+            <span class="pin pin-query">?</span>
+            <span class="meta">{% if question.status == 'unsure' %}Flagged for a person{% else %}Needs your answer{% endif %}</span>
           </p>
-          <p class="question-text">{{ question.prompt }}</p>
+          <p class="query-text">{{ question.prompt }}</p>
           {% if question.line_id %}
-          <button type="button" class="text-link" data-line-ref="{{ question.line_id }}">Show me on the bill</button>
+          <button type="button" class="link" data-line-ref="{{ question.line_id }}">Show the line on the bill</button>
           {% endif %}
           {% if question.status == 'unsure' %}
-          <p class="muted small">A person will check this one. You can still answer it.</p>
+          <p class="small muted">A person will check this one. You can still answer it.</p>
           {% endif %}
-          <div class="answers">
-            <button type="submit" name="action" value="confirm" class="btn btn-block">
+          <div class="query-answers">
+            <button type="submit" name="action" value="confirm" class="button">
               Yes, {{ display(question.field_name, question.read_value) }} is right
             </button>
-            <div class="answer-correct">
+            <div class="query-correct">
               <input type="{{ 'date' if question.field_name in date_fields else 'text' }}"
-                     name="value" placeholder="Or type what the bill says" class="field">
-              <button type="submit" name="action" value="correct" class="btn btn-secondary">Use this</button>
+                     name="value" placeholder="Or type what the bill says" class="field"
+                     aria-label="The value printed on the bill">
+              <button type="submit" name="action" value="correct" class="button button-secondary">Use this</button>
             </div>
-            <button type="submit" name="action" value="unsure" class="btn-plain">I'm not sure</button>
+            <button type="submit" name="action" value="unsure" class="button-ghost">I'm not sure</button>
           </div>
         </form>
         {% endfor %}
@@ -112,25 +118,25 @@
       {% elif bill.status == 'enriched' and enrichment %}
         <dl class="facts">
           <div><dt>Business</dt><dd>{{ enrichment.profile.sector }}, {{ enrichment.profile.employees }} staff</dd></div>
-          <div><dt>Usage</dt><dd>About {{ '{:,}'.format(enrichment.annual_kwh) }} kWh a year at the current rate of use</dd></div>
+          <div><dt>Usage</dt><dd>About {{ '{:,}'.format(enrichment.annual_kwh) }} kWh a year</dd></div>
           <div><dt>Contract</dt><dd>Ends in {{ enrichment.days_left }} days, on {{ pretty_date(enrichment.contract_end) }}</dd></div>
         </dl>
-        <p class="muted small">
+        <p class="small">
           No saving is shown. There is no market price data here, and an invented figure is the
           fastest way to lose a small business owner.
         </p>
 
       {% elif bill.status in ('awaiting_approval', 'approved', 'sent', 'replied') and payload %}
-        <div class="sub">
-          <div class="sub-head">
-            <h3>What we will send</h3>
-            <span class="chip mono" title="Hash of the enquiry payload">{{ enquiry.payload_hash[:12] }}</span>
+        <div class="part">
+          <div class="part-head">
+            <p class="meta">{{ 'What we sent' if bill.status in ('sent', 'replied') else 'What we will send' }}</p>
+            <span class="mono" title="Hash of the enquiry">Version {{ enquiry.payload_hash[:8] }}</span>
           </div>
           <div class="letter">{{ enquiry.covering_note }}</div>
         </div>
 
-        <div class="sub">
-          <h3>The figures in the request</h3>
+        <div class="part">
+          <p class="meta part-head">The figures in the request</p>
           <dl class="rows">
             <div><dt>Meter number</dt><dd class="mono">{{ payload.supply.mpan }}</dd></div>
             <div><dt>Site</dt><dd>{{ payload.supply.address }}, {{ payload.supply.postcode }}</dd></div>
@@ -141,264 +147,228 @@
           </dl>
         </div>
 
-        <div class="sub">
-          <h3>Who it goes to</h3>
+        <div class="part">
+          <p class="meta part-head">{{ 'Sent to' if bill.status in ('sent', 'replied') else 'Who it goes to' }}</p>
           <ul class="people">
             {% for recipient in payload.recipients %}
-            <li>
-              <span class="avatar" aria-hidden="true">{{ recipient.name[:1] }}</span>
-              <span class="person">
-                <span>{{ recipient.name }}</span>
-                <span class="muted small">{{ recipient.email }}</span>
-              </span>
-            </li>
+            <li><span>{{ recipient.name }}</span><span class="mono">{{ recipient.email }}</span></li>
             {% endfor %}
           </ul>
         </div>
 
-        <div class="sub">
-          <h3>What happens next</h3>
+        {% if bill.status == 'awaiting_approval' %}
+        <div class="part">
+          <p class="meta part-head">What happens next</p>
           <p>
             Each supplier replies with a quote. Nothing is switched and no contract is signed.
             Choosing a quote is a second decision with an approval of its own.
           </p>
         </div>
-
-        {% if bill.status == 'awaiting_approval' %}
-        <form class="approve" method="post" action="/bills/{{ bill.id }}/approve">
+        <form class="part" method="post" action="/bills/{{ bill.id }}/approve">
           <input type="hidden" name="approver" value="{{ payload.business.contact }}">
           <label class="tick">
             <input type="checkbox" name="authority" value="yes" id="authority">
-            <span class="tick-box" aria-hidden="true">{{ icon_check() }}</span>
+            <span class="tick-box" aria-hidden="true"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 8.5 3 3 6-7"/></svg></span>
             <span>I authorise Bill to Enquiry to request quotes from these suppliers on my behalf.</span>
           </label>
-          <button type="submit" id="approve-button" class="btn btn-lg btn-block" disabled>Approve as {{ payload.business.contact }}</button>
+          <button type="submit" id="approve-button" class="button">Approve as {{ payload.business.contact }}</button>
         </form>
         {% elif approval %}
-        <p class="banner banner-good">
-          <span class="banner-icon">{{ icon_check() }}</span>
-          <span>
-            Approved by {{ approval.approver }} on {{ when(approval.approved_at) }}, covering version
-            <code>{{ approval.payload_hash[:12] }}</code>.
-          </span>
-        </p>
+        <div class="part">
+          <p class="signed">
+            <span class="pin">&#10003;</span>
+            <span>
+              Approved by {{ approval.approver }} on {{ when(approval.approved_at) }}. The approval
+              covers version <span class="mono">{{ approval.payload_hash[:8] }}</span>.
+            </span>
+          </p>
+        </div>
         {% else %}
-        <p class="banner banner-warn">
-          <span class="banner-icon">!</span>
-          <span>
-            There is no approval covering this version of the enquiry. Sending is refused until the
-            owner approves it again.
-          </span>
-        </p>
+        <div class="part">
+          <p class="void">
+            No approval covers this version of the enquiry, so sending is refused until the owner
+            approves it again.
+          </p>
+        </div>
         {% endif %}
 
         {% if bill.status == 'approved' %}
-        <form method="post" action="/bills/{{ bill.id }}/send" class="stack-top">
-          <button type="submit" class="btn btn-lg btn-block">Send to the three suppliers</button>
+        <form class="stage-actions" method="post" action="/bills/{{ bill.id }}/send">
+          <button type="submit" class="button">Send to the three suppliers</button>
         </form>
         {% endif %}
 
-      {% elif bill.status == 'rejected' %}
-        <p>The owner rejected this enquiry. Nothing was sent.</p>
-
-      {% elif bill.status == 'failed' %}
-        <p class="banner banner-bad">
-          <span class="banner-icon">{{ icon_cross() }}</span>
-          <span>This bill could not be read. The timeline below says why.</span>
-        </p>
-      {% endif %}
-
-      {% if bill.status in ('sent', 'replied') %}
-        <div class="sub">
-          <h3>Sent</h3>
+        {% if bill.status in ('sent', 'replied') %}
+        <div class="part">
+          <div class="part-head">
+            <p class="meta">The outbox</p>
+            <span class="mono">{{ outbox|length }} rows</span>
+          </div>
           <ul class="people">
             {% for row in outbox %}
-            <li>
-              <span class="avatar avatar-good" aria-hidden="true">{{ icon_check() }}</span>
-              <span class="person">
-                <span>{{ row.recipient }}</span>
-                <span class="muted small">Written to the outbox {{ when(row.created_at, true) }}</span>
-              </span>
-            </li>
+            <li><span>{{ row.recipient }}</span><span class="mono">{{ when(row.created_at, true) }}</span></li>
             {% endfor %}
           </ul>
           <div class="button-row">
             <form method="post" action="/bills/{{ bill.id }}/send">
-              <button type="submit" class="btn btn-secondary">Send again (simulate a retry)</button>
+              <button type="submit" class="button button-secondary button-small">Send again to simulate a retry</button>
             </form>
             <form method="post" action="/bills/{{ bill.id }}/reply">
-              <button type="submit" class="btn btn-secondary">Simulate a supplier reply</button>
+              <button type="submit" class="button button-secondary button-small">Simulate a supplier reply</button>
             </form>
           </div>
           {% for reply in replies %}
           <blockquote class="reply">
-            <p class="reply-from">{{ reply.recipient }}</p>
             <p>{{ reply.body }}</p>
+            <cite class="meta">{{ reply.recipient }}</cite>
           </blockquote>
           {% endfor %}
         </div>
+        {% endif %}
+
+      {% elif bill.status == 'rejected' %}
+        <p>The owner rejected this enquiry. Nothing was sent, and the timeline below records why.</p>
+
+      {% elif bill.status == 'failed' %}
+        <p class="void">This bill could not be read. The timeline below records why.</p>
       {% endif %}
 
       {% if runnable %}
-      <div class="card-actions">
+      <div class="stage-actions">
         <form method="post" action="/bills/{{ bill.id }}/next">
-          <button type="submit" class="btn btn-lg">Run next stage: {{ current_stage }}</button>
+          <button type="submit" class="button">Run next stage: {{ current_stage }}</button>
         </form>
         <form method="post" action="/bills/{{ bill.id }}/run">
-          <button type="submit" class="btn-plain">Run to approval</button>
+          <button type="submit" class="button-ghost">Run to approval</button>
         </form>
       </div>
-      {% elif waiting %}
+      {% elif waiting and bill.status not in ('rejected', 'failed') %}
       <p class="waiting">{{ waiting }}</p>
       {% endif %}
 
       {% if enquiry and bill.status in ('awaiting_approval', 'approved') %}
-      <div class="disclosures">
+      <div class="more">
         <details>
           <summary>Edit a value</summary>
-          <p class="muted small">
-            Changing anything changes the hash of the enquiry, which voids an approval of the
+          <p class="small muted">
+            Changing anything changes the hash of the enquiry, which voids any approval of the
             older version.
           </p>
-          <form method="post" action="/bills/{{ bill.id }}/edit" class="inline-form">
-            <select name="field" class="field">
+          <form method="post" action="/bills/{{ bill.id }}/edit" class="inline-form" id="edit-form">
+            <select name="field" class="field" aria-label="Field to change">
               {% for field in fields %}
-              <option value="{{ field.name }}">{{ label(field.name) }}</option>
+              <option value="{{ field.name }}" data-kind="{{ 'date' if field.name in date_fields else 'text' }}">{{ label(field.name) }}</option>
               {% endfor %}
             </select>
-            <input type="text" name="value" placeholder="New value" required class="field">
-            <button type="submit" class="btn btn-secondary">Change it</button>
+            <input type="text" name="value" placeholder="New value" required class="field" aria-label="New value">
+            <button type="submit" class="button button-secondary">Change it</button>
           </form>
         </details>
+        {% if bill.status == 'awaiting_approval' %}
         <details>
           <summary>Reject this enquiry</summary>
           <form method="post" action="/bills/{{ bill.id }}/reject" class="inline-form">
-            <input type="text" name="reason" placeholder="Why" required class="field">
-            <button type="submit" class="btn btn-secondary btn-danger">Reject</button>
+            <input type="text" name="reason" placeholder="Why" required class="field" aria-label="Reason">
+            <button type="submit" class="button button-secondary">Reject</button>
           </form>
         </details>
+        {% endif %}
       </div>
       {% endif %}
-    </div>
 
-    {# ---------- the reasoning for this stage ---------- #}
-    {% if decisions %}
-    <div class="card why">
-      <p class="eyebrow">Why it works this way</p>
-      {% for decision in decisions %}
-      <article>
-        <h3>{{ decision.title }}</h3>
-        <div class="prose-small">{{ decision.html|safe }}</div>
-      </article>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {# ---------- everything the reader produced ---------- #}
-    {% if fields %}
-    <div class="card">
-      <header class="card-head card-head-row">
-        <h2 class="h-small">What we read</h2>
-        <span class="muted small">{{ fields|length }} fields</span>
-      </header>
-      <ul class="read-list">
-        {% for field in fields %}
-        <li>
-          <span class="read-label">{{ label(field.name) }}</span>
-          <button type="button" class="read-value" data-line-ref="{{ field.line_id }}">
-            {{ display(field.name, field.value) }}
-          </button>
-          <span class="read-src">
-            {% if field.source == 'customer' and field.value == field.read_value %}
-              <span class="tag tag-good">Confirmed by you</span>
-            {% elif field.source == 'customer' %}
-              <span class="tag tag-warn">Corrected by you</span>
-              <span class="read-was">was {{ display(field.name, field.read_value) }}</span>
-            {% else %}
-              <span class="conf {{ 'conf-low' if field.confidence < 0.85 }}" title="Reader confidence">
-                <span class="conf-bar"><span style="width: {{ (field.confidence * 100)|round|int }}%"></span></span>
-                {{ '{:.0%}'.format(field.confidence) }}
-              </span>
-            {% endif %}
-          </span>
-        </li>
+      {% if decisions %}
+      <aside class="why" aria-label="Why it works this way">
+        <p class="meta">Why it works this way</p>
+        {% for decision in decisions %}
+        <article>
+          <h3>{{ decision.title }}</h3>
+          {{ decision.html|safe }}
+        </article>
         {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
-
-    {# ---------- the checks ---------- #}
-    {% if checks %}
-    {% set passed = checks|selectattr('passed')|list|length %}
-    <div class="card">
-      <header class="card-head card-head-row">
-        <h2 class="h-small">Checks</h2>
-        <span class="muted small">{{ passed }} of {{ checks|length }} pass</span>
-      </header>
-      <p class="muted small">Plain code, no model. Each one is a function in <code>app/checks.py</code>.</p>
-      {% macro check_row(check) %}
-        {% set state = 'pass' if check.passed else ('settled' if check.accepted else 'fail') %}
-        <li class="check-{{ state }}">
-          <span class="check-icon" title="{{ {'pass': 'Passed', 'settled': 'Settled by the owner', 'fail': 'Failed'}[state] }}">
-            {% if state == 'pass' %}{{ icon_check() }}{% elif state == 'fail' %}{{ icon_cross() }}{% else %}{{ icon_dash() }}{% endif %}
-          </span>
-          <span class="check-body">
-            <span class="check-title">{{ check.title }}</span>
-            <span class="check-msg">{{ check.message }}</span>
-          </span>
-        </li>
-      {% endmacro %}
-      {% set quiet = [] %}
-      <ul class="checks">
-        {% for check in checks %}
-          {% if check.passed and check.name.startswith('confidence:') %}
-            {% set _ = quiet.append(check) %}
-          {% else %}
-            {{ check_row(check) }}
-          {% endif %}
-        {% endfor %}
-      </ul>
-      {% if quiet %}
-      <details class="checks-more">
-        <summary>
-          <span class="check-icon check-icon-pass">{{ icon_check() }}</span>
-          <span class="check-body">
-            <span class="check-title">{{ quiet|length }} fields read with confidence above 85%</span>
-            <span class="check-msg">Show each one</span>
-          </span>
-        </summary>
-        <ul class="checks">
-          {% for check in quiet %}{{ check_row(check) }}{% endfor %}
-        </ul>
-      </details>
+      </aside>
       {% endif %}
-    </div>
-    {% endif %}
 
+      {% if fields %}
+      <section class="block" aria-labelledby="read-title">
+        <header class="block-head">
+          <h3 id="read-title">What we read</h3>
+          <span class="meta">{{ fields|length }} fields</span>
+        </header>
+        <ul class="read">
+          {% for field in fields %}
+          <li>
+            <span class="read-label">{{ label(field.name) }}</span>
+            <span>
+              <button type="button" class="read-value" data-line-ref="{{ field.line_id }}">{{ display(field.name, field.value) }}</button>
+              {% if field.source == 'customer' and field.value != field.read_value %}
+              <span class="read-was">Read as {{ display(field.name, field.read_value) }}</span>
+              {% endif %}
+            </span>
+            {% if field.source == 'customer' and field.value == field.read_value %}
+              <span class="read-src is-owner">You confirmed</span>
+            {% elif field.source == 'customer' %}
+              <span class="read-src is-owner">You corrected</span>
+            {% else %}
+              <span class="read-src {{ 'is-low' if field.confidence < 0.85 }}" title="Reader confidence">{{ '%.2f'|format(field.confidence) }}</span>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      {% if checks %}
+      {% set passed = checks|selectattr('passed')|list|length %}
+      <section class="block" aria-labelledby="checks-title">
+        <header class="block-head">
+          <h3 id="checks-title">Checks</h3>
+          <span class="meta">{{ passed }} of {{ checks|length }} pass</span>
+        </header>
+        {% set quiet = [] %}
+        <ul class="checks">
+          {% for check in checks %}
+            {% if check.passed and check.name.startswith('confidence:') %}
+              {% set _ = quiet.append(check) %}
+            {% else %}
+              {{ check_row(check) }}
+            {% endif %}
+          {% endfor %}
+        </ul>
+        {% if quiet %}
+        <details class="checks-more">
+          <summary>
+            <span class="check-mark">Pass</span>
+            <span>
+              <span class="check-title">{{ quiet|length }} fields read with confidence of 0.85 or more</span>
+              <span class="check-msg">Show each one</span>
+            </span>
+          </summary>
+          <ul class="checks">
+            {% for check in quiet %}{{ check_row(check) }}{% endfor %}
+          </ul>
+        </details>
+        {% endif %}
+        <p class="hint">Plain code, no model. Each check is a function in <code>app/checks.py</code>.</p>
+      </section>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="block log" aria-labelledby="log-title">
+    <header class="block-head">
+      <h3 id="log-title">What happened</h3>
+      <span class="meta">Append-only record</span>
+    </header>
+    <ol>
+      {% for event in events %}
+      <li>
+        <span class="log-time">{{ when(event.at, true) }}</span>
+        <span class="log-actor">{{ event.actor }}</span>
+        <span class="log-detail">{{ event.detail }}</span>
+        {% if event.to_status %}<span class="status status-{{ event.to_status }}">{{ status_label(event.to_status) }}</span>{% else %}<span></span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
   </section>
 </div>
-
-<section class="card timeline-card">
-  <header class="card-head card-head-row">
-    <h2 class="h-small">What happened</h2>
-    <span class="muted small">Append-only record</span>
-  </header>
-  <ol class="timeline">
-    {% for event in events %}
-    <li>
-      <span class="timeline-dot" aria-hidden="true"></span>
-      <div class="timeline-body">
-        <p class="timeline-detail">{{ event.detail }}</p>
-        <p class="timeline-meta">
-          <span>{{ when(event.at, true) }}</span>
-          <span class="timeline-actor">{{ event.actor }}</span>
-          {% if event.to_status %}
-          <span class="pill pill-{{ event.to_status }}">{{ status_label(event.to_status) }}</span>
-          {% endif %}
-        </p>
-      </div>
-    </li>
-    {% endfor %}
-  </ol>
-</section>
 {% endblock %}

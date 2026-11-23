@@ -70,6 +70,9 @@ def edit_value(conn: sqlite3.Connection, bill, field: str, value: str) -> str:
         return "Type a value to change it to."
     if field not in checks.FIELD_LABELS:
         return "That is not a field on this bill."
+    problem = checks.problem_with(field, value)
+    if problem:
+        return problem
 
     bills.set_value(conn, bill["id"], field, value, "customer")
     stages.evaluate(conn, bill)

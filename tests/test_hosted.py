@@ -33,7 +33,7 @@ def new_instance(data_dir):
 
 
 def pill(page: str) -> str:
-    return re.search(r'class="bill-meta">.*?class="pill[^"]*">([^<]+)<', page, re.S).group(1)
+    return re.search(r'class="bill-facts">\s*<span class="status[^"]*">([^<]+)<', page).group(1)
 
 
 def test_a_visitor_keeps_their_place_when_every_request_lands_somewhere_new(hosted):
@@ -137,15 +137,87 @@ def test_a_visitor_id_cannot_point_outside_the_data_folder(hosted):
 
 
 def test_the_journal_stops_growing_before_the_cookie_limit(hosted):
-    visitor = journal.Visitor(vid="0" * 20)
+    visitor = journal.Visitor(vid=journal.new_vid())
     token = journal.CURRENT.set(visitor)
     try:
         for _ in range(400):
-            journal.record(["next", 1])
+            journal.record([journal.stamp(), "next", 1])
     finally:
         journal.CURRENT.reset(token)
-    assert len(journal.encode(visitor.entries)) <= journal.MAX_JOURNAL_BYTES
+    assert len(journal.encode(visitor.lines)) <= journal.MAX_JOURNAL_BYTES
     assert visitor.stale
+
+
+def test_a_full_journal_refuses_the_change_instead_of_forgetting_it(hosted, monkeypatch):
+    monkeypatch.setattr(journal, "MAX_LINES", 2)
+    with visitor_client() as client:
+        client.get("/")
+        client.post("/bills/1/next")
+        client.post("/bills/1/next")
+        page = client.post("/bills/1/next").text
+        assert "This demo copy is full" in page
+        new_instance(hosted)
+        assert pill(client.get("/bills/1").text) == "Ready"
+
+
+def test_a_forged_sample_name_is_never_read_from_disk(hosted):
+    secret = hosted / "secret.html"
+    secret.write_text("<p>not for visitors</p>")
+    forged = [[journal.stamp(), "sample", "../../" + str(secret.with_suffix(""))]]
+    assert journal.decode(journal.encode(forged)) == []
+    forged_upload = [[journal.stamp(), "upload", "x.html", "../app/templates/base", None]]
+    assert journal.decode(journal.encode(forged_upload)) == []
+    with visitor_client() as client:
+        client.get("/")
+        client.cookies.set(journal.JOURNAL_COOKIE, journal.encode(forged))
+        assert "not for visitors" not in client.get("/bills/5").text
+
+
+def test_a_replay_keeps_the_times_things_first_happened(hosted):
+    with visitor_client() as client:
+        client.get("/")
+        client.post("/bills/1/run")
+        before = re.findall(r'class="log-time">([^<]+)<', client.get("/bills/1").text, re.S)
+        new_instance(hosted)
+        after = re.findall(r'class="log-time">([^<]+)<', client.get("/bills/1").text, re.S)
+        assert before and before == after
+
+
+def test_a_change_that_fails_part_way_is_undone(hosted, monkeypatch):
+    from app import approvals
+
+    with visitor_client() as client:
+        client.get("/")
+        client.post("/bills/1/run")
+
+        def broken(conn, bill, name, value):
+            conn.execute("UPDATE fields SET value = 'half done' WHERE bill_id = 1")
+            conn.commit()
+            raise RuntimeError("fell over")
+
+        monkeypatch.setattr(approvals, "edit_value", broken)
+        page = client.post("/bills/1/edit", data={"field": "business_name", "value": "x"}).text
+        assert "nothing was changed" in page
+        assert "half done" not in page
+
+
+def test_reject_after_approval_is_refused_politely(hosted):
+    with visitor_client() as client:
+        client.get("/")
+        client.post("/bills/1/run")
+        client.post("/bills/1/approve", data={"approver": "Owner", "authority": "yes"})
+        response = client.post("/bills/1/reject", data={"reason": "changed my mind"})
+        assert response.status_code == 200
+        assert pill(response.text) == "Approved"
+
+
+def test_a_visitor_whose_id_expired_keeps_their_journal(hosted):
+    with visitor_client() as client:
+        client.get("/")
+        client.post("/bills/1/run")
+        client.cookies.delete(journal.VISITOR_COOKIE)
+        new_instance(hosted)
+        assert pill(client.get("/bills/1").text) == "Awaiting approval"
 
 
 def test_a_local_run_writes_no_cookies(tmp_path, monkeypatch):

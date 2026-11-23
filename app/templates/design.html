@@ -2,40 +2,43 @@
 {% block title %}The design{% endblock %}
 
 {% block content %}
-<section class="hero hero-compact">
-  <p class="eyebrow">The design</p>
-  <h1 class="display display-sm">The thinking, before the code.</h1>
-  <p class="lede">
-    These are the files in <code>docs/</code>, in the order they were written. The brief the build
-    followed is <code>BUILD_BRIEF.md</code> in the repository.
-  </p>
-</section>
+<div class="wrap">
+  <header class="page-head">
+    <p class="meta">The design</p>
+    <h1>The thinking came before the code.</h1>
+    <p class="lead">
+      These are the files in <code>docs/</code>, in the order they were written. The brief the
+      build followed is <code>BUILD_BRIEF.md</code>, and the look is described in
+      <code>DESIGN.md</code>.
+    </p>
+  </header>
 
-<div class="design">
-  <aside class="contents" aria-label="Contents">
-    <p class="col-label">Contents</p>
-    <ol>
+  <div class="design-body">
+    <nav class="toc" aria-label="Contents">
+      <p class="meta">Contents</p>
+      <ol>
+        {% for page in pages %}
+        {% set parts = page.title.split('. ', 1) %}
+        <li>
+          <a href="#{{ page.slug }}" data-spy="{{ page.slug }}">
+            <span class="num">{{ '%02d'|format(loop.index) }}</span>
+            <span>{{ parts[1] if parts|length > 1 else page.title }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ol>
+    </nav>
+
+    <div class="chapters">
       {% for page in pages %}
       {% set parts = page.title.split('. ', 1) %}
-      <li>
-        <a href="#{{ page.slug }}" data-spy="{{ page.slug }}">
-          <span class="contents-n">{{ '%02d'|format(loop.index) }}</span>
-          <span>{{ parts[1] if parts|length > 1 else page.title }}</span>
-        </a>
-      </li>
+      <section class="chapter" id="{{ page.slug }}">
+        <p class="chapter-num" aria-hidden="true">{{ '%02d'|format(loop.index) }}</p>
+        <h2>{{ parts[1] if parts|length > 1 else page.title }}</h2>
+        <div class="prose">{{ page.html|safe }}</div>
+      </section>
       {% endfor %}
-    </ol>
-  </aside>
-
-  <div class="blocks">
-    {% for page in pages %}
-    {% set parts = page.title.split('. ', 1) %}
-    <section class="card block" id="{{ page.slug }}">
-      <p class="block-n">{{ '%02d'|format(loop.index) }}</p>
-      <h2>{{ parts[1] if parts|length > 1 else page.title }}</h2>
-      <div class="prose">{{ page.html|safe }}</div>
-    </section>
-    {% endfor %}
+    </div>
   </div>
 </div>
 {% endblock %}

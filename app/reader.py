@@ -8,6 +8,7 @@ Leaves out: OCR, so a photograph of a bill would need a vision model in front of
 import json
 
 from app import config
+from app.seed import SAMPLE_NAMES
 
 FIELD_NAMES = (
     "business_name",
@@ -75,7 +76,7 @@ def validate(raw) -> dict:
 def read_recorded(bill) -> dict:
     """Replay the model output saved for one of the sample bills."""
     sample = bill["sample_name"]
-    if not sample:
+    if sample not in SAMPLE_NAMES:
         raise ReaderUnavailable(
             "Demo mode reads the sample bills only. Set a model key to read other files."
         )

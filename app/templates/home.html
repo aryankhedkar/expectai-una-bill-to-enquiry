@@ -1,120 +1,147 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="hero">
-  <p class="eyebrow eyebrow-brand">
-    <img src="/static/brand/expectai-ring.svg" alt="" width="16" height="16">
-    A design sketch for ExpectAI
-  </p>
-  <h1 class="display">From an energy bill<br class="wide-only"> to an enquiry the owner approved.</h1>
-  <p class="lede">
-    A small business uploads an electricity bill. The system reads it, checks what it read,
-    asks about anything it is unsure of, drafts a quote request to suppliers, waits for
-    approval, and sends it once.
-  </p>
-  <div class="hero-actions">
-    <form method="post" action="/samples/clean">
-      <button type="submit" class="btn btn-lg">Start with a clean bill</button>
-    </form>
-    <a class="link-arrow" href="/design">Read the design</a>
+<section class="wrap opening">
+  <div>
+    <p class="meta">A design sketch for ExpectAI</p>
+    <h1 class="display">From an energy bill to an enquiry the owner <span class="mark">approved</span>.</h1>
+    <p class="lead">
+      A small business uploads an electricity bill. The system reads it, checks what it read,
+      asks about anything it is unsure of, drafts a quote request to suppliers, waits for
+      approval, and sends it once.
+    </p>
+    <div class="actions">
+      <form method="post" action="/samples/clean">
+        <button type="submit" class="button">Open the clean bill</button>
+      </form>
+      <a class="arrow-link" href="/design">Read the design</a>
+    </div>
   </div>
+
+  <figure class="specimen">
+    <div class="specimen-sheet" aria-hidden="true">
+      <div class="specimen-head">
+        <p class="specimen-supplier">Caledon Energy</p>
+        <p class="specimen-kind">Electricity bill, issued 6 October 2026</p>
+      </div>
+      <dl class="specimen-lines">
+        <div class="specimen-line"><dt>Supply number (MPAN)</dt><dd>1400098765432</dd><span class="pin">1</span></div>
+        <div class="specimen-line"><dt>Total due</dt><dd>£909.96</dd><span class="pin">2</span></div>
+        <div class="specimen-line"><dt>Contract ends</dt><dd class="faint-print">31 January 2027</dd><span class="pin pin-query">3</span></div>
+      </dl>
+    </div>
+    <ol class="specimen-notes">
+      <li><span class="pin">1</span><p><strong>The check digit agrees.</strong> The first twelve digits, weighted and summed, give the thirteenth.</p></li>
+      <li><span class="pin">2</span><p><strong>The sums agree.</strong> £758.30 of charges and £151.66 of VAT make £909.96.</p></li>
+      <li><span class="pin pin-query">3</span><p><strong>Read at 55% confidence.</strong> Too faint to trust, so the owner is asked.</p></li>
+    </ol>
+    <figcaption>
+      <p class="meta">Fig. 1 &middot; The model reads, code checks, the owner decides</p>
+      <form method="post" action="/samples/faint_contract_date" class="specimen-open">
+        <button type="submit" class="link link-pen">Open this bill</button>
+      </form>
+    </figcaption>
+  </figure>
 </section>
 
-{% if message %}<p class="flash"><span class="flash-dot" aria-hidden="true"></span>{{ message }}</p>{% endif %}
+{% if message %}<div class="wrap home-notice"><p class="notice">{{ message }}</p></div>{% endif %}
 
-<section class="section">
-  <ol class="journey" aria-label="The eight stages">
+<section class="wrap section" aria-labelledby="journey-title">
+  <header class="section-head">
+    <p class="meta">The journey</p>
+    <h2 id="journey-title">Eight stages from upload to send.</h2>
+  </header>
+  <ol class="journey">
     {% set journey = [
-      ('Upload', 'Stored under the hash of its contents.'),
-      ('Read', 'Each field with a confidence and a source line.'),
-      ('Check', 'Sums, formats and dates tested in plain code.'),
-      ('Ask', 'Anything uncertain becomes a question.'),
-      ('Enrich', 'Annual usage and time left on the contract.'),
+      ('Upload', 'Stored under the hash of its contents, so the same bill twice is one bill.'),
+      ('Read', 'Every field arrives with a confidence and the line it came from.'),
+      ('Check', 'Sums, formats, dates and the meter check digit, in plain code.'),
+      ('Ask', 'Anything that fails or is uncertain becomes one question for the owner.'),
+      ('Enrich', 'Annual usage and the days left on the contract.'),
       ('Draft', 'A template filled with checked values only.'),
-      ('Approve', 'Tied to a hash of exactly what is sent.'),
+      ('Approve', 'Tied to a hash of exactly what will be sent.'),
       ('Send', 'Once, however many times it is retried.'),
     ] %}
     {% for name, line in journey %}
     <li>
-      <span class="journey-n">{{ loop.index }}</span>
-      <span class="journey-name">{{ name }}</span>
-      <span class="journey-line">{{ line }}</span>
+      <span class="num">{{ '%02d'|format(loop.index) }}</span>
+      <div>
+        <p class="journey-name">{{ name }}</p>
+        <p class="journey-line">{{ line }}</p>
+      </div>
     </li>
     {% endfor %}
   </ol>
 </section>
 
-<section class="section">
+<section class="wrap section" aria-labelledby="samples-title">
   <header class="section-head">
-    <h2>Sample bills</h2>
-    <p>Each one shows a different way the journey protects the owner.</p>
+    <p class="meta">Sample bills</p>
+    <h2 id="samples-title">Four bills. Three carry a planted error.</h2>
   </header>
-  <div class="samples">
+  <ul class="exhibits">
     {% for sample in samples %}
-    <form method="post" action="/samples/{{ sample.name }}">
-      <button type="submit" class="sample">
-        <span class="sample-tag">{{ sample.tag }}</span>
-        <span class="sample-title">{{ sample.title }}</span>
-        <span class="sample-blurb">{{ sample.blurb }}</span>
-        <span class="sample-foot">
-          <span class="mono">{{ sample.name }}.html</span>
-          <span class="sample-open">Open</span>
-        </span>
-      </button>
-    </form>
+    <li>
+      <form method="post" action="/samples/{{ sample.name }}">
+        <button type="submit" class="exhibit">
+          <span class="meta">{{ sample.tag }}</span>
+          <span>
+            <span class="exhibit-title">{{ sample.title }}</span>
+            <span class="exhibit-blurb">{{ sample.blurb }}</span>
+          </span>
+          <span class="exhibit-file">{{ sample.name }}.html</span>
+          <span class="exhibit-go">Open</span>
+        </button>
+      </form>
+    </li>
     {% endfor %}
-  </div>
+  </ul>
 </section>
 
-<section class="section">
-  <div class="card upload-card">
-    <div class="upload-copy">
-      <h2>Upload a bill</h2>
-      <p>
-        Uploading a sample file again shows the duplicate check: the file is hashed, the hash is
-        already here, and no second bill is created.
-      </p>
-      <p class="muted small">
-        Any other file is accepted and then fails at the reading stage, because demo mode replays
-        recorded output for the samples only.
-      </p>
-    </div>
-    <form class="dropzone" method="post" action="/upload" enctype="multipart/form-data">
-      <input type="file" name="file" id="file" required aria-label="Choose a bill to upload">
-      <span class="dropzone-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
-      </span>
-      <span class="dropzone-text" data-empty="Drop a bill here, or click to choose a file">Drop a bill here, or click to choose a file</span>
-      <button type="submit" class="btn" id="upload-button">Upload</button>
-    </form>
-  </div>
-</section>
-
-<section class="section">
+<section class="wrap section upload" aria-labelledby="upload-title">
   <header class="section-head">
-    <h2>Bills</h2>
-    <p>Every bill on this copy of the app, newest first.</p>
+    <p class="meta">Upload</p>
+    <h2 id="upload-title">Try the duplicate check.</h2>
+    <p>
+      Upload a sample file you already opened. It is hashed, the hash is already here, and no
+      second bill is created. Any other file is accepted and then stops at the reading stage,
+      because demo mode replays recorded output for the samples only.
+    </p>
+  </header>
+  <form class="dropzone" method="post" action="/upload" enctype="multipart/form-data">
+    <input type="file" name="file" id="file" required aria-label="Choose a bill to upload">
+    <span class="meta">Drop a file here or click to choose</span>
+    <span class="dropzone-text" data-empty="No file chosen yet.">No file chosen yet.</span>
+    <button type="submit" class="button button-secondary" id="upload-button">Upload</button>
+  </form>
+</section>
+
+<section class="wrap section" aria-labelledby="bills-title">
+  <header class="section-head">
+    <p class="meta">On this copy</p>
+    <h2 id="bills-title">Bills</h2>
   </header>
   {% if bills %}
-  <ul class="list">
+  <ul class="ledger">
+    <li class="ledger-head" aria-hidden="true">
+      <span class="meta">File</span><span class="meta">Status</span><span class="meta">Opened</span><span></span>
+    </li>
     {% for bill in bills %}
     <li>
-      <a class="list-row" href="/bills/{{ bill.id }}">
-        <span class="file-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
-        </span>
-        <span class="list-main">
-          <span class="list-title">{{ bill.filename }}</span>
-          <span class="list-sub">Opened {{ when(bill.created_at) }}</span>
-        </span>
-        <span class="pill pill-{{ bill.status }}">{{ status_label(bill.status) }}</span>
-        <span class="chev" aria-hidden="true"></span>
+      <a class="ledger-row" href="/bills/{{ bill.id }}">
+        <span class="ledger-file">{{ bill.filename }}</span>
+        <span class="status status-{{ bill.status }}">{{ status_label(bill.status) }}</span>
+        <span class="ledger-time">{{ when(bill.created_at) }}</span>
+        <span class="ledger-go">Open</span>
       </a>
     </li>
     {% endfor %}
   </ul>
   {% else %}
-  <p class="empty">No bills yet. Open one of the samples above.</p>
+  <div class="ledger ledger-empty">
+    <h3>No bills yet.</h3>
+    <p class="muted">Open one of the four samples above and it will be listed here.</p>
+  </div>
   {% endif %}
 </section>
 {% endblock %}
