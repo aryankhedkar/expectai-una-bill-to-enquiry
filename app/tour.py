@@ -175,7 +175,7 @@ def beats(s: dict) -> list[dict]:
         },
         {
             "act": 1, "stage": 2, "status": "Needs an answer", "panel": "checks", "target": "p-checks", "line": None,
-            "title": f"{n_checks} checks run in plain Python on each bill, covering the dates, the meter number, the VAT rate and the arithmetic from each line up to the total.",
+            "title": f"Each bill goes through {n_checks} checks in plain Python, covering the dates, the meter number, the VAT rate and the arithmetic from each line up to the total.",
             "body": "Arithmetic should give the same answer each time, so it lives in small functions that can be read and tested on their own, and money is allowed to differ by five pence.",
         },
         {
