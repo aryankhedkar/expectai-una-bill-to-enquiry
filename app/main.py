@@ -9,9 +9,10 @@ import json
 import sqlite3
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -27,7 +28,20 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Bill to Enquiry", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=config.ROOT / "app" / "static"), name="static")
 templates = Jinja2Templates(directory=str(config.ROOT / "app" / "templates"))
+
+
+def when(stamp: str, with_seconds: bool = False) -> str:
+    """A stored timestamp as a person reads it: 23 Nov, 12:40."""
+    try:
+        moment = datetime.fromisoformat(stamp)
+    except (TypeError, ValueError):
+        return stamp or ""
+    clock = "%H:%M:%S" if with_seconds else "%H:%M"
+    return f"{moment.day} {moment.strftime('%b')}, {moment.strftime(clock)}"
+
+
 templates.env.globals.update(
+    when=when,
     label=checks.label,
     pretty_date=checks.pretty_date,
     pretty_money=checks.pretty_money,
@@ -58,25 +72,32 @@ STOPPED = {status.REJECTED, status.FAILED}
 SAMPLES = [
     {
         "name": "clean",
+        "tag": "Straight through",
         "title": "A bill that reads cleanly",
         "blurb": "Every field read with confidence and every check passes, so it goes straight through to a draft enquiry.",
     },
     {
         "name": "total_mismatch",
+        "tag": "Arithmetic",
         "title": "Two digits transposed in the total",
         "blurb": "The charges add up to one figure and the printed total says another. Arithmetic catches it, not the model.",
     },
     {
         "name": "faint_contract_date",
+        "tag": "Confidence",
         "title": "A contract date read faintly",
         "blurb": "The reader is only 55% sure of the contract end date, so the owner is asked instead of guessed at.",
     },
     {
         "name": "misread_mpan",
+        "tag": "Check digit",
         "title": "A confidently wrong meter number",
         "blurb": "The reader got one digit wrong and was sure of it. The check digit is what notices.",
     },
 ]
+
+
+SAMPLE_BY_NAME = {sample["name"]: sample for sample in SAMPLES}
 
 
 def get_conn() -> sqlite3.Connection:
@@ -88,6 +109,11 @@ def get_conn() -> sqlite3.Connection:
 def go(bill_id: int, message: str = "") -> RedirectResponse:
     suffix = f"?msg={message}" if message else ""
     return RedirectResponse(f"/bills/{bill_id}{suffix}", status_code=303)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(config.ROOT / "app" / "static" / "brand" / "favicon.png", media_type="image/png")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -162,6 +188,9 @@ def bill_page(request: Request, bill_id: int, msg: str = ""):
         stage_list.append({"name": name, "state": state})
 
     current_stage = next((s["name"] for s in stage_list if s["state"] == "current"), STAGES[-1])
+    current_number = next(
+        (i + 1 for i, s in enumerate(stage_list) if s["state"] == "current"), None
+    )
 
     enquiry = stages.current_enquiry(conn, bill_id)
     payload = json.loads(enquiry["payload_json"]) if enquiry else None
@@ -174,6 +203,8 @@ def bill_page(request: Request, bill_id: int, msg: str = ""):
         "message": msg,
         "stages": stage_list,
         "current_stage": current_stage,
+        "current_number": current_number,
+        "sample": SAMPLE_BY_NAME.get(bill["sample_name"] or ""),
         "fields": bills.field_rows(conn, bill_id),
         "checks": conn.execute(
             "SELECT * FROM checks WHERE bill_id = ? ORDER BY passed, id", (bill_id,)

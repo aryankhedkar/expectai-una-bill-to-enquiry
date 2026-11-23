@@ -1,60 +1,120 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="intro">
-  <h1>From an energy bill to an enquiry the owner approved</h1>
-  <p>
+<section class="hero">
+  <p class="eyebrow eyebrow-brand">
+    <img src="/static/brand/expectai-ring.svg" alt="" width="16" height="16">
+    A design sketch for ExpectAI
+  </p>
+  <h1 class="display">From an energy bill<br class="wide-only"> to an enquiry the owner approved.</h1>
+  <p class="lede">
     A small business uploads an electricity bill. The system reads it, checks what it read,
     asks about anything it is unsure of, drafts a quote request to suppliers, waits for
     approval, and sends it once.
   </p>
-  <p>
-    The reasoning behind each stage is on the <a href="/design">design page</a> and beside the
-    stage it belongs to. Start with a sample bill and press through the eight stages.
-  </p>
+  <div class="hero-actions">
+    <form method="post" action="/samples/clean">
+      <button type="submit" class="btn btn-lg">Start with a clean bill</button>
+    </form>
+    <a class="link-arrow" href="/design">Read the design</a>
+  </div>
 </section>
 
-{% if message %}<p class="flash">{{ message }}</p>{% endif %}
+{% if message %}<p class="flash"><span class="flash-dot" aria-hidden="true"></span>{{ message }}</p>{% endif %}
 
-<h2>Sample bills</h2>
-<div class="cards">
-  {% for sample in samples %}
-  <form class="card" method="post" action="/samples/{{ sample.name }}">
-    <h3>{{ sample.title }}</h3>
-    <p class="muted">{{ sample.blurb }}</p>
-    <p><code>{{ sample.name }}.html</code></p>
-    <button type="submit">Open this bill</button>
-  </form>
-  {% endfor %}
-</div>
-
-<h2>Upload a bill</h2>
-<form class="upload" method="post" action="/upload" enctype="multipart/form-data">
-  <input type="file" name="file" required>
-  <button type="submit">Upload</button>
-</form>
-<p class="muted">
-  Uploading one of the sample files again shows the duplicate check: the file is hashed, the
-  hash is already here, and no second bill is created. Any other file is accepted and then
-  fails at the reading stage, because demo mode replays recorded output for the samples only.
-</p>
-
-<h2>Bills</h2>
-{% if bills %}
-<table class="grid">
-  <thead><tr><th>File</th><th>Status</th><th>Opened</th><th></th></tr></thead>
-  <tbody>
-    {% for bill in bills %}
-    <tr>
-      <td>{{ bill.filename }}</td>
-      <td><span class="pill pill-{{ bill.status }}">{{ status_label(bill.status) }}</span></td>
-      <td class="muted">{{ bill.created_at }}</td>
-      <td><a href="/bills/{{ bill.id }}">Open</a></td>
-    </tr>
+<section class="section">
+  <ol class="journey" aria-label="The eight stages">
+    {% set journey = [
+      ('Upload', 'Stored under the hash of its contents.'),
+      ('Read', 'Each field with a confidence and a source line.'),
+      ('Check', 'Sums, formats and dates tested in plain code.'),
+      ('Ask', 'Anything uncertain becomes a question.'),
+      ('Enrich', 'Annual usage and time left on the contract.'),
+      ('Draft', 'A template filled with checked values only.'),
+      ('Approve', 'Tied to a hash of exactly what is sent.'),
+      ('Send', 'Once, however many times it is retried.'),
+    ] %}
+    {% for name, line in journey %}
+    <li>
+      <span class="journey-n">{{ loop.index }}</span>
+      <span class="journey-name">{{ name }}</span>
+      <span class="journey-line">{{ line }}</span>
+    </li>
     {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="muted">No bills yet. Open one of the samples above.</p>
-{% endif %}
+  </ol>
+</section>
+
+<section class="section">
+  <header class="section-head">
+    <h2>Sample bills</h2>
+    <p>Each one shows a different way the journey protects the owner.</p>
+  </header>
+  <div class="samples">
+    {% for sample in samples %}
+    <form method="post" action="/samples/{{ sample.name }}">
+      <button type="submit" class="sample">
+        <span class="sample-tag">{{ sample.tag }}</span>
+        <span class="sample-title">{{ sample.title }}</span>
+        <span class="sample-blurb">{{ sample.blurb }}</span>
+        <span class="sample-foot">
+          <span class="mono">{{ sample.name }}.html</span>
+          <span class="sample-open">Open</span>
+        </span>
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="card upload-card">
+    <div class="upload-copy">
+      <h2>Upload a bill</h2>
+      <p>
+        Uploading a sample file again shows the duplicate check: the file is hashed, the hash is
+        already here, and no second bill is created.
+      </p>
+      <p class="muted small">
+        Any other file is accepted and then fails at the reading stage, because demo mode replays
+        recorded output for the samples only.
+      </p>
+    </div>
+    <form class="dropzone" method="post" action="/upload" enctype="multipart/form-data">
+      <input type="file" name="file" id="file" required aria-label="Choose a bill to upload">
+      <span class="dropzone-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+      </span>
+      <span class="dropzone-text" data-empty="Drop a bill here, or click to choose a file">Drop a bill here, or click to choose a file</span>
+      <button type="submit" class="btn" id="upload-button">Upload</button>
+    </form>
+  </div>
+</section>
+
+<section class="section">
+  <header class="section-head">
+    <h2>Bills</h2>
+    <p>Every bill on this copy of the app, newest first.</p>
+  </header>
+  {% if bills %}
+  <ul class="list">
+    {% for bill in bills %}
+    <li>
+      <a class="list-row" href="/bills/{{ bill.id }}">
+        <span class="file-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+        </span>
+        <span class="list-main">
+          <span class="list-title">{{ bill.filename }}</span>
+          <span class="list-sub">Opened {{ when(bill.created_at) }}</span>
+        </span>
+        <span class="pill pill-{{ bill.status }}">{{ status_label(bill.status) }}</span>
+        <span class="chev" aria-hidden="true"></span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No bills yet. Open one of the samples above.</p>
+  {% endif %}
+</section>
 {% endblock %}

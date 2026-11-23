@@ -2,9 +2,11 @@
 
 An independent sketch of one journey in an AI product for small businesses. A business owner uploads an electricity bill. The system reads it, checks what it read, asks the owner about anything it is unsure of, drafts a quote request to suppliers, waits for approval, sends it once, and keeps a record of every step.
 
-This is a design exercise I built for myself. It is not connected to, endorsed by or affiliated with any company, and it is not an implementation of anyone's product. Every business, supplier, address and meter number in it is invented.
+This is a design exercise I built to talk through with ExpectAI. Their wordmark is in the header because that is who it was made for. It is not an ExpectAI product, it is not an implementation of Una, and nothing in it comes from their code. Every business, supplier, address and meter number in it is invented.
 
 The point of the repository is the reasoning rather than the code. `docs/` holds the problem, the questions I would ask before building, the assumptions I took, and the decisions with what each one costs. The app shows the same reasoning next to the stage it belongs to.
+
+Live copy: https://expectai-una-bill-to-enquiry.vercel.app
 
 ## Run it
 
@@ -46,3 +48,5 @@ Python 3.11 or newer. Nothing leaves your machine: there are no network calls in
 ## How this was built
 
 I worked the design out with Claude and built it with Cursor on 23 November 2026. The data is synthetic. The reader replays recorded model output unless a model key is set.
+
+The interface follows a plain, system-font style: white cards on a soft grey page, one accent colour taken from the ExpectAI wordmark, and no CSS framework or build step.

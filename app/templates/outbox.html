@@ -2,29 +2,38 @@
 {% block title %}Outbox{% endblock %}
 
 {% block content %}
-<h1>Outbox</h1>
-<p class="muted">
-  Sending writes a row here rather than sending an email. The unique key is the enquiry, the
-  recipient and the hash of what was approved, so running send again writes nothing.
-</p>
+<section class="hero hero-compact">
+  <p class="eyebrow">Outbox</p>
+  <h1 class="display display-sm">Written once, whatever the retries.</h1>
+  <p class="lede">
+    Sending writes a row here rather than sending an email. The unique key is the enquiry, the
+    recipient and the hash of what was approved, so running send again writes nothing.
+  </p>
+</section>
 
 {% if rows %}
-<table class="grid">
-  <thead>
-    <tr><th>Bill</th><th>Recipient</th><th>Approved hash</th><th>Written</th></tr>
-  </thead>
-  <tbody>
-    {% for row in rows %}
-    <tr>
-      <td><a href="/bills/{{ row.bill_id }}">{{ row.filename }}</a></td>
-      <td>{{ row.recipient }}</td>
-      <td><code>{{ row.payload_hash[:16] }}</code></td>
-      <td class="muted">{{ row.created_at }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="card table-card">
+  <table class="table">
+    <thead>
+      <tr><th>Bill</th><th>Recipient</th><th>Approved version</th><th>Written</th></tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td><a href="/bills/{{ row.bill_id }}">{{ row.filename }}</a></td>
+        <td>{{ row.recipient }}</td>
+        <td><span class="chip mono">{{ row.payload_hash[:12] }}</span></td>
+        <td class="muted">{{ when(row.created_at, true) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% else %}
-<p class="muted">Nothing has been sent yet.</p>
+<div class="card empty-card">
+  <p class="empty-title">Nothing has been sent yet.</p>
+  <p class="muted">Approve an enquiry on any bill and send it. Its rows appear here.</p>
+  <a class="link-arrow" href="/">Go to the bills</a>
+</div>
 {% endif %}
 {% endblock %}

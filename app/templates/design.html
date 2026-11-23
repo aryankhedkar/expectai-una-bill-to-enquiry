@@ -2,25 +2,38 @@
 {% block title %}The design{% endblock %}
 
 {% block content %}
+<section class="hero hero-compact">
+  <p class="eyebrow">The design</p>
+  <h1 class="display display-sm">The thinking, before the code.</h1>
+  <p class="lede">
+    These are the files in <code>docs/</code>, in the order they were written. The brief the build
+    followed is <code>BUILD_BRIEF.md</code> in the repository.
+  </p>
+</section>
+
 <div class="design">
-  <aside class="contents">
-    <h2>Contents</h2>
+  <aside class="contents" aria-label="Contents">
+    <p class="col-label">Contents</p>
     <ol>
       {% for page in pages %}
-      <li><a href="#{{ page.slug }}">{{ page.title }}</a></li>
+      {% set parts = page.title.split('. ', 1) %}
+      <li>
+        <a href="#{{ page.slug }}" data-spy="{{ page.slug }}">
+          <span class="contents-n">{{ '%02d'|format(loop.index) }}</span>
+          <span>{{ parts[1] if parts|length > 1 else page.title }}</span>
+        </a>
+      </li>
       {% endfor %}
     </ol>
-    <p class="muted">
-      These are the files in <code>docs/</code>, in the order they were written. The brief the
-      build followed is <code>BUILD_BRIEF.md</code> in the repository.
-    </p>
   </aside>
 
   <div class="blocks">
     {% for page in pages %}
-    <section class="block" id="{{ page.slug }}">
-      <h2>{{ page.title }}</h2>
-      {{ page.html|safe }}
+    {% set parts = page.title.split('. ', 1) %}
+    <section class="card block" id="{{ page.slug }}">
+      <p class="block-n">{{ '%02d'|format(loop.index) }}</p>
+      <h2>{{ parts[1] if parts|length > 1 else page.title }}</h2>
+      <div class="prose">{{ page.html|safe }}</div>
     </section>
     {% endfor %}
   </div>

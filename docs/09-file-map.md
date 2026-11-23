@@ -18,7 +18,8 @@
 | `app/evaluate.py` | Reader accuracy per field against the known answers |
 | `app/main.py` | The routes, the stage tracker and the page context |
 | `app/templates/` | `base`, `home`, `bill`, `design` and `outbox` |
-| `app/static/` | One stylesheet and about thirty lines of JavaScript |
+| `app/static/` | One stylesheet and a small script: line highlighting, the authority tick, the upload box and the contents on the design page |
+| `app/static/brand/` | The ExpectAI wordmark and ring, used in the header and as the favicon |
 | `samples/` | Four bills in two layouts, with a `data-line` id on every value |
 | `fixtures/extractions/` | The recorded reader output for each sample |
 | `fixtures/expected/` | What each bill says, for the evaluation |
